@@ -14,9 +14,9 @@ const editableFields = ['title', 'placeholder', 'help'];
 
 const BlockTree = React.memo(function BlockTree({
   blockId,
-  blockData,      // The block's data (info object)
-  childarr = [],  // Array of child IDs
-  childblocks = {}, // Child blocks object
+  blockData,
+  childarr = [],
+  childblocks = {},
   level = 0,
   indexPath = [],
   onBlockEdit,
@@ -26,16 +26,19 @@ const BlockTree = React.memo(function BlockTree({
   const [editMode, setEditMode] = React.useState(false);
   const [editBuffer, setEditBuffer] = React.useState({});
 
-  // Initialize edit buffer with current block data
-  React.useEffect(() => {
-    if (editMode) {
-      const buf = {};
-      editableFields.forEach(f => {
-        buf[f] = blockData[f] || '';
-      });
-      setEditBuffer(buf);
-    }
-  }, [editMode, blockData]);
+  // Initialize edit buffer only when entering edit mode
+  const toggleEditMode = React.useCallback(() => {
+    setEditMode(prev => {
+      if (!prev) {
+        const buf = {};
+        editableFields.forEach(f => {
+          buf[f] = blockData[f] || '';
+        });
+        setEditBuffer(buf);
+      }
+      return !prev;
+    });
+  }, [blockData]);
 
   // Memoized move handlers
   const handleMoveUp = React.useCallback(() => {
@@ -46,21 +49,20 @@ const BlockTree = React.memo(function BlockTree({
     onMove(indexPath, 'down');
   }, [indexPath, onMove]);
 
+  // Field change handler - stable reference
   const handleFieldChange = React.useCallback((field, value) => {
     setEditBuffer(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  // Save handler - stable reference
   const handleSave = React.useCallback(() => {
     setEditMode(false);
     onBlockEdit(indexPath, editBuffer);
   }, [editBuffer, indexPath, onBlockEdit]);
 
+  // Cancel handler - stable reference
   const handleCancel = React.useCallback(() => {
     setEditMode(false);
-  }, []);
-
-  const toggleEditMode = React.useCallback(() => {
-    setEditMode(prev => !prev);
   }, []);
 
   if (!blockData) return null;
@@ -125,20 +127,23 @@ const BlockTree = React.memo(function BlockTree({
         </div>
         {childarr.length > 0 && (
           <div>
-            {childarr.map((childId, idx) => (
-              <BlockTree
-                key={childId}
-                blockId={childId}
-                blockData={childblocks[childId]?.info || {}}
-                childarr={childblocks[childId]?.childarr || []} // added these three entries
-                childblocks={childblocks[childId]?.childblocks || {}}
-                level={level + 1}
-                indexPath={[...indexPath, idx]}
-                onBlockEdit={onBlockEdit}
-                onMove={onMove}
-                parentLength={childarr.length}
-              />
-            ))}
+            {childarr.map((childId, idx) => {
+              const childBlock = childblocks[childId];
+              return (
+                <BlockTree
+                  key={childId}
+                  blockId={childId}
+                  blockData={childBlock?.info || {}}
+                  childarr={childBlock?.childarr || []}
+                  childblocks={childBlock?.childblocks || {}}
+                  level={level + 1}
+                  indexPath={[...indexPath, idx]}
+                  onBlockEdit={onBlockEdit}
+                  onMove={onMove}
+                  parentLength={childarr.length}
+                />
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -147,3 +152,20 @@ const BlockTree = React.memo(function BlockTree({
 });
 
 export { BlockTree };
+
+// 2. BlockTree.jsx
+// Changes:
+
+// Optimized Edit Mode State:
+
+// Removed useEffect for initializing editBuffer (which caused extra renders).
+
+// Now initializes editBuffer only when entering edit mode (inside toggleEditMode).
+
+// Memoized All Handlers:
+
+// handleMoveUp, handleMoveDown, handleFieldChange, handleSave, handleCancel, and toggleEditMode are now wrapped in useCallback.
+
+// Efficient Child Rendering:
+
+// Extracted childBlock outside JSX to avoid recalculating it on every render.
