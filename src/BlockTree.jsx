@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
-
 import IconButton from '@mui/material/IconButton';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Check';
@@ -32,9 +31,9 @@ const BlockTree = React.memo(function BlockTree({ blockId, blocks, level = 0, in
 
   if (!block) return null;
 
-  const handleFieldChange = (field, value) => {
+  const handleFieldChange = useCallback((field, value) => {
     setEditBuffer(prev => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
   const handleSave = () => {
     setEditMode(false);
@@ -44,11 +43,14 @@ const BlockTree = React.memo(function BlockTree({ blockId, blocks, level = 0, in
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditMode(false);
-  };
+  }, []);
 
   // console.log("indexPath", indexPath)
+   
+  const info = React.useMemo(() => block.info, [block.info]);
+
 
   return (
     <Card className={`${level > 0 ? `pl-${Math.min(level * 6, 24)}` : ''}`} variant="outlined">
@@ -100,7 +102,7 @@ const BlockTree = React.memo(function BlockTree({ blockId, blocks, level = 0, in
               />
             ))
           ) : (
-            Object.entries(block.info).map(([k, v]) => (
+            Object.entries(info).map(([k, v]) => (
               <span key={k}><b>{k}</b>: {String(v)};</span>
             ))
           )}

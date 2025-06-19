@@ -6,6 +6,7 @@ import { BlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
 
 // Helper to update nested array by index path
+//path for example [2,0,1]
 function updateByIndexPath(arr, path, updater) {
   // console.log("path: ", path , " arr: ", arr)
   if (path.length === 0) return updater(arr);
@@ -38,28 +39,36 @@ export default function BlockOrderPage() {
       setError('Invalid JSON');
     }
   };
-
+  
+  // Purpose: Converts input array to order + blocks structure
+  // Returns: { order: [blockIds], blocks: { [blockId]: { info, childarr, childblocks } } }
   const result = React.useMemo(() => {
     const res = convertToOrderBlocks(inputArr);
     return res;
   }, [inputArr]);
 
-  // Sync JSON editor with inputArr
+  // Sync the navigation movements up/down from GUI with the input arr
   React.useEffect(() => {
     setJson(JSON.stringify(inputArr, null, 2));
   }, [inputArr]);
 
   console.log("result: ", result)
 
+
+  // Purpose: Handles editing/updating of block properties (title, placeholder, help text, etc.)
+  // indexPath: Array of indices leading to the block to edit
+  // updatedFields: Object containing fields to update recieved from BlockTree.js
   const onBlockEdit = (indexPath, updatedFields) => {
     setInputArr(prev =>
       updateByIndexPath(prev, indexPath, item => ({
-        ...item,
-        ...updatedFields
+        ...item, // Keep existing properties
+      ...updatedFields   // Override with updated ones
       }))
     );
   };
 
+
+  // Purpose: Handles reordering blocks (moving them up/down in the hierarchy)
   const onMove = (indexPath, direction) => {
     console.log("indexPath: ", indexPath)
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
