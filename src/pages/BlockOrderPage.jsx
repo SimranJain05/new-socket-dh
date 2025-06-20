@@ -3,9 +3,9 @@ import { input } from '../inputData.js';
 import { convertToOrderBlocks, moveItemInNestedArray, updateByIndexPath } from '../utils.js';
 import { MemoizedBlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
-import InputBuilder from '../components/InputBuilder';
+import InputBuilder from '../components/InputBuilder'; // Ensure InputBuilder is imported
 
-export default function BlockOrderPage() {
+export default function BlockOrderPage({ showJsonEditorOnly = false }) { // Removed onAddField prop from here, it's handled internally now
   const [json, setJson] = useState(JSON.stringify(input, null, 2));
   const [inputArr, setInputArr] = useState(input);
   const [error, setError] = useState(null);
@@ -31,11 +31,12 @@ export default function BlockOrderPage() {
     }
   }, [json]);
 
+
   // Sync the navigation movements up/down from GUI with the input array
   React.useEffect(() => {
     setJson(JSON.stringify(inputArr, null, 2));
   }, [inputArr]);
-   
+
   //Purpose: Handles editing/updating of block properties (title, placeholder, help text, etc.)
   // indexPath: Array of indices leading to the block to edit
   // updatedFields: Object containing fields to update recieved from BlockTree.js
@@ -55,40 +56,87 @@ export default function BlockOrderPage() {
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
   }, []);
 
-  // Purpose: Handles adding new fields to the form structure
-  // parentPath: Array of indices leading to the parent block (empty for root level)
-  // newField: The new field object to add
-  const handleAddField = useCallback((parentPath, newField) => {
+  // New function to add a field, wrapping the existing updateByIndexPath
+  const onAddField = useCallback((parentPath, newField) => {
     setInputArr(prev => {
       if (parentPath.length === 0) {
+        // Add to the root level
         return [...prev, newField];
+      } else {
+        // Add as a child to an existing item at parentPath
+        return updateByIndexPath(prev, parentPath, (item) => {
+          // Ensure 'children' is an array before pushing
+          const currentChildren = Array.isArray(item.children) ? item.children : [];
+          return {
+            ...item,
+            children: [...currentChildren, newField],
+          };
+        });
       }
-      return updateByIndexPath(prev, parentPath, item => ({
-        ...item,
-        children: [...(item.children || []), newField]
-      }));
     });
   }, []);
 
+  // Purpose: Handles deleting blocks
+  const onBlockDelete = useCallback((indexPath) => {
+    setInputArr(prev => {
+        if (indexPath.length === 1) {
+            // Deleting a root-level item
+            const newArr = [...prev];
+            newArr.splice(indexPath[0], 1);
+            return newArr;
+        }
+        // Deleting a nested item
+        return updateByIndexPath(prev, indexPath.slice(0, -1), (parent) => {
+            const indexToDelete = indexPath[indexPath.length - 1];
+            const newChildren = [...parent.children];
+            newChildren.splice(indexToDelete, 1);
+            return { ...parent, children: newChildren };
+        });
+    });
+  }, []);
+
+  // Purpose: Handles duplicating blocks
+  const onBlockDuplicate = useCallback((indexPath) => {
+    setInputArr(prev => {
+        if (indexPath.length === 1) {
+            // Duplicating a root-level item
+            const itemToDuplicate = prev[indexPath[0]];
+            const duplicatedItem = { ...itemToDuplicate, id: `${itemToDuplicate.id}-copy-${Date.now()}` }; // Generate unique ID
+            const newArr = [...prev];
+            newArr.splice(indexPath[0] + 1, 0, duplicatedItem);
+            return newArr;
+        }
+        // Duplicating a nested item
+        return updateByIndexPath(prev, indexPath.slice(0, -1), (parent) => {
+            const indexToDuplicate = indexPath[indexPath.length - 1];
+            const itemToDuplicate = parent.children[indexToDuplicate];
+            const duplicatedItem = { ...itemToDuplicate, id: `${itemToDuplicate.id}-copy-${Date.now()}` }; // Generate unique ID
+            const newChildren = [...parent.children];
+            newChildren.splice(indexToDuplicate + 1, 0, duplicatedItem);
+            return { ...parent, children: newChildren };
+        });
+    });
+  }, []);
+
+
   return (
-    <div className="flex w-full gap-4 p-4">
-      <div className="w-1/2 mr-4">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold">Editable inputData</h2>
-          <InputBuilder onAddField={handleAddField} />
-        </div>
-        <div className="h-full">
-          <JsonEditor 
-            value={json} 
-            onChange={handleJsonChange} 
-            onBlur={handleJsonBlur} 
+    <>
+      {showJsonEditorOnly ? (
+        <div className="w-full h-full">
+          <JsonEditor
+            value={json}
+            onChange={handleJsonChange}
+            onBlur={handleJsonBlur}
           />
+          {error && <div className="text-red-500 mt-2">{error}</div>}
         </div>
-        {error && <div className="text-red-500 mt-2">{error}</div>}
-      </div>
-      <div className="w-1/2">
-        <h2 className="text-lg font-semibold mb-2">Rendered Block Tree</h2>
-        <div className="h-full">
+      ) : (
+        <div className="w-full h-full">
+          {/* InputBuilder for adding root-level fields */}
+          <div style={{marginBottom: '16px'}}> {/* Added margin for spacing */}
+            <InputBuilder onAddField={onAddField} parentPath={[]} />
+          </div>
+
           {result.order.map((blockId, i) => {
             const block = result.blocks[blockId];
             return (
@@ -101,12 +149,15 @@ export default function BlockOrderPage() {
                 indexPath={[i]}
                 onBlockEdit={onBlockEdit}
                 onMove={onMove}
+                onBlockDelete={onBlockDelete} // Pass delete handler
+                onBlockDuplicate={onBlockDuplicate} // Pass duplicate handler
+                onAddField={onAddField} // Pass add field handler for nested additions
                 parentLength={inputArr.length}
               />
             );
           })}
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

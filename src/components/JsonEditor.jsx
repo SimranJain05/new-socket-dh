@@ -3,12 +3,23 @@ import React from 'react';
 export default function JsonEditor({ value, onChange, onBlur }) {
   return (
     <textarea
-      className="w-full h-full font-mono text-sm bg-gray-900 text-gray-100 p-3 rounded resize-none border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
       value={value}
-      onChange={e => onChange(e.target.value)}
+      onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
-      spellCheck={false}
-      style={{ minHeight: 300 }}
+      style={{
+        width: '100%',
+        height: '100%',
+        // REMOVE the next two lines. The height should be 100% of its
+        // container, and manual resizing will conflict with this.
+        // minHeight: '500px',
+        // resize: 'vertical',
+        fontFamily: 'monospace',
+        fontSize: '14px',
+        padding: '12px',
+        boxSizing: 'border-box',
+        border: 'none', // Optional: for a cleaner look within the Paper
+        outline: 'none', // Optional: remove focus ring
+      }}
     />
   );
 }

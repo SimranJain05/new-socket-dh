@@ -10,9 +10,11 @@ import CancelIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import InputBuilder from './components/InputBuilder';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'; // Import for Duplicate
+import DeleteIcon from '@mui/icons-material/Delete'; // Import for Delete
+import InputBuilder from './components/InputBuilder'; // Still needed for nested adding
 
-const editableFields = ['title', 'placeholder', 'help'];
+const editableFields = ['title', 'placeholder', 'help']; // These are the fields currently editable inline
 
 function BlockTree({
   blockId,
@@ -23,11 +25,14 @@ function BlockTree({
   indexPath = [],
   onBlockEdit,
   onMove,
+  onBlockDelete, // New prop
+  onBlockDuplicate, // New prop
+  onAddField, // New prop (for nested adds)
   parentLength
 }) {
   const [editMode, setEditMode] = useState(false);
   const [editBuffer, setEditBuffer] = useState({});
-  
+
   // Initialize edit buffer only when entering edit mode
   const toggleEditMode = useCallback(() => {
     setEditMode(prev => {
@@ -63,6 +68,25 @@ function BlockTree({
     setEditMode(false);
   }, []);
 
+  const handleDelete = useCallback(() => {
+    if (window.confirm(`Are you sure you want to delete field "${blockData.title || blockId}"?`)) {
+      onBlockDelete(indexPath);
+    }
+  }, [indexPath, onBlockDelete, blockData.title, blockId]);
+
+  const handleDuplicate = useCallback(() => {
+    onBlockDuplicate(indexPath);
+  }, [indexPath, onBlockDuplicate]);
+
+  // This will be for opening a comprehensive edit dialog, potentially using InputBuilder
+  // For now, it just logs, as InputBuilder itself needs modification to support an "edit" mode
+  const handleFullEdit = useCallback(() => {
+    console.log("Full edit triggered for field:", blockId, blockData);
+    // TODO: Open InputBuilder dialog pre-filled with blockData for full editing
+    // This would involve passing blockData to InputBuilder and changing its behavior based on a prop.
+  }, [blockId, blockData]);
+
+
   if (!blockData) return null;
 
   const currentIndex = indexPath[indexPath.length - 1];
@@ -70,7 +94,7 @@ function BlockTree({
   const canMoveDown = currentIndex < parentLength - 1;
 
   return (
-    <Card className={`${level > 0 ? `pl-${Math.min(level * 6, 24)}` : ''}`} variant="outlined">
+    <Card className={`${level > 0 ? `pl-${Math.min(level * 6, 24)}` : ''} mb-2`} variant="outlined">
       <CardContent>
         <div>
           <div className="flex items-center justify-between mb-1">
@@ -97,14 +121,22 @@ function BlockTree({
                 </>
               )}
             </div>
-            {editMode ? (
-              <div>
-                <IconButton size="small" onClick={handleSave} color="primary"><SaveIcon /></IconButton>
-                <IconButton size="small" onClick={handleCancel}><CancelIcon /></IconButton>
-              </div>
-            ) : (
-              <IconButton size="small" onClick={toggleEditMode}><EditIcon /></IconButton>
-            )}
+            {/* Action buttons as per UI image */}
+            <div>
+              {editMode ? (
+                <>
+                  <IconButton size="small" onClick={handleSave} color="primary"><SaveIcon /></IconButton>
+                  <IconButton size="small" onClick={handleCancel}><CancelIcon /></IconButton>
+                </>
+              ) : (
+                <>
+                  {/* The main "Edit" button, ideally opens a full InputBuilder dialog */}
+                  <IconButton size="small" onClick={handleFullEdit}><EditIcon /></IconButton>
+                  <IconButton size="small" onClick={handleDuplicate}><ContentCopyIcon fontSize="small" /></IconButton>
+                  <IconButton size="small" onClick={handleDelete}><DeleteIcon fontSize="small" color="error" /></IconButton>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex flex-col gap-2 text-gray-800 text-sm mb-2">
             {editMode ? (
@@ -119,17 +151,25 @@ function BlockTree({
                 />
               ))
             ) : (
-              Object.entries(blockData).map(([k, v]) => (
-                <span key={k}><b>{k}</b>: {String(v)};</span>
-              ))
+              // Display all relevant blockData properties
+              Object.entries(blockData).map(([k, v]) => {
+                if (k === 'children' && (Array.isArray(v) && v.length === 0 || typeof v === 'string')) return null; // Don't display empty children or dynamic children string here
+                if (k === 'options' && Array.isArray(v)) {
+                    return <span key={k}><b>{k}</b>: {v.map(opt => `${opt.label}:${opt.value}`).join(', ')};</span>;
+                }
+                if (k === 'dynamicChildren' || k === 'dynamicOptions') {
+                    return <span key={k}><b>{k}</b>: <code style={{backgroundColor: '#eee', padding: '2px 4px', borderRadius: '3px'}}>{String(v)}</code>;</span>;
+                }
+                return <span key={k}><b>{k}</b>: {String(v)};</span>;
+              })
             )}
           </div>
           {childarr.length > 0 && (
-            <div className="mt-2">
+            <div className="mt-2" style={{ borderLeft: '2px solid #ddd', paddingLeft: '8px', marginLeft: '4px' }}> {/* Visual nesting */}
               <div className="mb-2">
-                <InputBuilder 
-                  onAddField={onBlockEdit} 
-                  parentPath={indexPath} 
+                <InputBuilder
+                  onAddField={onAddField} // Use the new onAddField for nested additions
+                  parentPath={indexPath}
                 />
               </div>
               {childarr.map((childId, idx) => {
@@ -145,6 +185,9 @@ function BlockTree({
                     indexPath={[...indexPath, idx]}
                     onBlockEdit={onBlockEdit}
                     onMove={onMove}
+                    onBlockDelete={onBlockDelete} // Pass through
+                    onBlockDuplicate={onBlockDuplicate} // Pass through
+                    onAddField={onAddField} // Pass through for deeper nesting
                     parentLength={childarr.length}
                   />
                 );
@@ -153,9 +196,9 @@ function BlockTree({
           )}
           {blockData.type === 'input_group' && childarr.length === 0 && (
             <div className="mt-2">
-              <InputBuilder 
-                onAddField={onBlockEdit} 
-                parentPath={indexPath} 
+              <InputBuilder
+                onAddField={onAddField} // Use the new onAddField for adding to empty input groups
+                parentPath={indexPath}
               />
             </div>
           )}
