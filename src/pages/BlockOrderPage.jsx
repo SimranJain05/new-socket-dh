@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { input } from '../inputData.js';
 import { convertToOrderBlocks } from '../blockUtils.js';
 import { moveItemInNestedArray } from '../moveUtils.js';
-import { BlockTree } from '../BlockTree.jsx';
+import { MemoizedBlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
 
 // Helper to update nested array by index path (memoized outside component)
@@ -99,41 +99,3 @@ export default function BlockOrderPage() {
     </div>
   );
 }
-
-// Optimized memoization with proper prop comparison
-const MemoizedBlockTree = React.memo(BlockTree, (prevProps, nextProps) => {
-  // Only re-render if block data or position changes
-  const shouldUpdate = 
-    prevProps.blockId !== nextProps.blockId ||
-    prevProps.indexPath.join() !== nextProps.indexPath.join() ||
-    prevProps.parentLength !== nextProps.parentLength ||
-    !isEqual(prevProps.blockData, nextProps.blockData) ||
-    !isEqual(prevProps.childarr, nextProps.childarr) ||
-    !isEqual(prevProps.childblocks, nextProps.childblocks);
-
-  return !shouldUpdate;
-});
-
-// Simple shallow comparison helper
-function isEqual(obj1, obj2) {
-  return JSON.stringify(obj1) === JSON.stringify(obj2);
-}
-
-
-// 1. BlockOrderPage.jsx
-// Changes:
-
-// Improved Memoization Logic:
-
-// Replaced shallow prop comparison with deep comparison using JSON.stringify for blockData, childarr, and childblocks.
-
-// Added a helper function isEqual to ensure accurate deep comparisons.
-
-// Now, MemoizedBlockTree only re-renders when props actually change.
-
-// Stable Callbacks:
-
-// Ensured onBlockEdit and onMove are memoized with useCallback to prevent unnecessary recreations.
-
-// Why?
-// Prevents re-renders of unrelated blocks when editing or moving a single block.
