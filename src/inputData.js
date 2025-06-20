@@ -5,30 +5,28 @@ export const input = [
     "title": "Full Name",
     "help": "Please provide your full legal name",
     "required": true,
-    "type": "input",
+    "type": "textField",
     "id": "A",
-    "defaultValue": "",
-    "children": []
+    "defaultValue": ""
   },
   {
     "placeholder": "Enter your email",
     "title": "Email Address",
     "help": "We’ll send updates to this email",
     "required": true,
-    "type": "email",
+    "type": "textField",
     "id": "B",
-    "defaultValue": "",
-    "children": []
+    "defaultValue": ""
   },
   {
     "id": "C",
-    "type": "input_group",
+    "type": "inputGroup",
     "title": "Contact Information",
     "help": "Group for various contact methods",
     "children": [
       {
         "id": "C1",
-        "type": "input_group",
+        "type": "inputGroup",
         "title": "Phone Number",
         "help": "Enter country code and number",
         "children": [
@@ -36,55 +34,57 @@ export const input = [
             "id": "C11",
             "type": "dropdown",
             "title": "Country Code",
+            "help": "Select your country code",
+            "required": true,
             "options": [
               { "label": "+1 (USA)", "value": "+1" },
               { "label": "+91 (India)", "value": "+91" }
             ],
             "defaultValue": "+91",
-            "children": []
+            "allowMultiSelect": false
           },
           {
             "id": "C12",
-            "type": "input",
-            "inputType": "tel",
+            "type": "textField",
+            "title": "Phone number",
+            "help": "Enter your phone number",
             "placeholder": "Phone number",
             "required": true,
-            "children": []
+            "defaultValue": ""
           }
         ]
       },
       {
         "id": "C2",
-        "type": "input_group",
+        "type": "inputGroup",
         "title": "Dynamic Fields",
         "help": "Fields generated dynamically",
-        "children": "// js function generateDynamicFields() -> returns array of fields like phone_block"
+        "children": []
       },
       {
         "id": "C3",
-        "type": "input_group",
+        "type": "inputGroup",
         "title": "Nested Group C3",
         "help": "Contains deeper nested fields",
         "children": [
           {
             "id": "C31",
-            "type": "text",
+            "type": "textField",
             "title": "C31 Field",
             "placeholder": "Static field C31",
             "help": "Some help text for C31",
             "required": true,
-            "defaultValue": "",
-            "children": []
+            "defaultValue": ""
           },
           {
             "id": "C32",
-            "type": "input_group",
+            "type": "inputGroup",
             "title": "Dynamic Subgroup C32",
-            "children": "// js function generateSubgroupFields() -> returns array of dynamic inputs"
+            "children": []
           },
           {
             "id": "C33",
-            "type": "input_group",
+            "type": "inputGroup",
             "title": "Subgroup C33",
             "help": "Another level of static fields",
             "children": []
