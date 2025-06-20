@@ -5,7 +5,10 @@ import { moveItemInNestedArray } from '../moveUtils.js';
 import { MemoizedBlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
 
+
+//Purpose: Recursively updates nested array based on index path
 // Helper to update nested array by index path (memoized outside component)
+//path for example [2,0,1]
 const updateByIndexPath = (arr, path, updater) => {
   if (path.length === 0) return updater(arr);
   const [head, ...rest] = path;
@@ -24,6 +27,8 @@ export default function BlockOrderPage() {
   const [error, setError] = useState(null);
 
   // Memoized result to prevent recalculation
+  // Purpose: Converts input array to order + blocks structure
+  // Returns: { order: [blockIds], blocks: { [blockId]: { info, childarr, childblocks } } }
   const result = useMemo(() => convertToOrderBlocks(inputArr), [inputArr]);
 
   // Stable callback for JSON changes
@@ -42,11 +47,15 @@ export default function BlockOrderPage() {
     }
   }, [json]);
 
-  // Sync JSON editor with inputArr
+
+  // Sync the navigation movements up/down from GUI with the input array
   React.useEffect(() => {
     setJson(JSON.stringify(inputArr, null, 2));
   }, [inputArr]);
-
+   
+  //Purpose: Handles editing/updating of block properties (title, placeholder, help text, etc.)
+  // indexPath: Array of indices leading to the block to edit
+  // updatedFields: Object containing fields to update recieved from BlockTree.js
   // Stable callback for block editing - now uses ref to avoid recreating on every render
   const onBlockEdit = useCallback((indexPath, updatedFields) => {
     setInputArr(prev =>
@@ -57,6 +66,8 @@ export default function BlockOrderPage() {
     );
   }, []);
 
+
+  // Purpose: Handles reordering blocks (moving them up/down in the hierarchy)
   // Stable callback for moving blocks - now uses ref to avoid recreating on every render
   const onMove = useCallback((indexPath, direction) => {
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
