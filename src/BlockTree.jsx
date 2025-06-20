@@ -10,6 +10,7 @@ import CancelIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import InputBuilder from './components/InputBuilder';
 
 const editableFields = ['title', 'placeholder', 'help'];
 
@@ -26,6 +27,7 @@ function BlockTree({
 }) {
   const [editMode, setEditMode] = useState(false);
   const [editBuffer, setEditBuffer] = useState({});
+  
   // Initialize edit buffer only when entering edit mode
   const toggleEditMode = useCallback(() => {
     setEditMode(prev => {
@@ -123,7 +125,13 @@ function BlockTree({
             )}
           </div>
           {childarr.length > 0 && (
-            <div>
+            <div className="mt-2">
+              <div className="mb-2">
+                <InputBuilder 
+                  onAddField={onBlockEdit} 
+                  parentPath={indexPath} 
+                />
+              </div>
               {childarr.map((childId, idx) => {
                 const childBlock = childblocks[childId];
                 return (
@@ -141,6 +149,14 @@ function BlockTree({
                   />
                 );
               })}
+            </div>
+          )}
+          {blockData.type === 'input_group' && childarr.length === 0 && (
+            <div className="mt-2">
+              <InputBuilder 
+                onAddField={onBlockEdit} 
+                parentPath={indexPath} 
+              />
             </div>
           )}
         </div>

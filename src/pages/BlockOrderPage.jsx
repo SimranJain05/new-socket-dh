@@ -3,6 +3,7 @@ import { input } from '../inputData.js';
 import { convertToOrderBlocks, moveItemInNestedArray, updateByIndexPath } from '../utils.js';
 import { MemoizedBlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
+import InputBuilder from '../components/InputBuilder';
 
 export default function BlockOrderPage() {
   const [json, setJson] = useState(JSON.stringify(input, null, 2));
@@ -30,7 +31,6 @@ export default function BlockOrderPage() {
     }
   }, [json]);
 
-
   // Sync the navigation movements up/down from GUI with the input array
   React.useEffect(() => {
     setJson(JSON.stringify(inputArr, null, 2));
@@ -49,17 +49,34 @@ export default function BlockOrderPage() {
     );
   }, []);
 
-
   // Purpose: Handles reordering blocks (moving them up/down in the hierarchy)
   // Stable callback for moving blocks - now uses ref to avoid recreating on every render
   const onMove = useCallback((indexPath, direction) => {
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
   }, []);
 
+  // Purpose: Handles adding new fields to the form structure
+  // parentPath: Array of indices leading to the parent block (empty for root level)
+  // newField: The new field object to add
+  const handleAddField = useCallback((parentPath, newField) => {
+    setInputArr(prev => {
+      if (parentPath.length === 0) {
+        return [...prev, newField];
+      }
+      return updateByIndexPath(prev, parentPath, item => ({
+        ...item,
+        children: [...(item.children || []), newField]
+      }));
+    });
+  }, []);
+
   return (
     <div className="flex w-full gap-4 p-4">
       <div className="w-1/2 mr-4">
-        <h2 className="text-lg font-semibold mb-2">Editable inputData</h2>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold">Editable inputData</h2>
+          <InputBuilder onAddField={handleAddField} />
+        </div>
         <div className="h-full">
           <JsonEditor 
             value={json} 
