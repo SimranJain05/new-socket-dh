@@ -1,25 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { input } from '../inputData.js';
-import { convertToOrderBlocks } from '../blockUtils.js';
-import { moveItemInNestedArray } from '../moveUtils.js';
+import { convertToOrderBlocks, moveItemInNestedArray, updateByIndexPath } from '../utils.js';
 import { MemoizedBlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
-
-
-//Purpose: Recursively updates nested array based on index path
-// Helper to update nested array by index path (memoized outside component)
-//path for example [2,0,1]
-const updateByIndexPath = (arr, path, updater) => {
-  if (path.length === 0) return updater(arr);
-  const [head, ...rest] = path;
-  return arr.map((item, idx) =>
-    idx === head
-      ? rest.length
-        ? { ...item, children: updateByIndexPath(item.children || [], rest, updater) }
-        : updater(item)
-      : item
-  );
-};
 
 export default function BlockOrderPage() {
   const [json, setJson] = useState(JSON.stringify(input, null, 2));
