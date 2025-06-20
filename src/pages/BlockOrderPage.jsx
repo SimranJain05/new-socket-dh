@@ -71,7 +71,11 @@ export default function BlockOrderPage() {
   const startAddField = useCallback((fieldType) => {
     setIsAddingField(true);
     setNewFieldConfig({
-      id: `field_${Date.now()}`,
+      id: Array(5)
+        .fill('')
+        .map(() => String.fromCharCode(97 + Math.floor(Math.random() * 26)))
+        .join(''),
+
       type: fieldType,
       title: `New ${fieldType}`,
       helptext: '',
