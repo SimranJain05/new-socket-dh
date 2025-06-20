@@ -112,7 +112,7 @@ const BlockTree = React.memo(function BlockTree({
             ))
           ) : (
             Object.entries(blockData).map(([k, v]) => (
-              <span key={k}><b>{k}</b>: {typeof v === 'string' || typeof v === 'number' ? String(v) : '[object]'}</span>
+              <span key={k}><b>{k}</b>: {typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : '[object]'}</span>
             ))
           )}
         </div>
