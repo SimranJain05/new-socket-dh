@@ -10,8 +10,6 @@ import TextField from '@mui/material/TextField';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
-const editableFields = ['title', 'placeholder', 'help'];
-
 const BlockTree = React.memo(function BlockTree({
   blockId,
   blockData,
@@ -26,21 +24,20 @@ const BlockTree = React.memo(function BlockTree({
   const [editMode, setEditMode] = React.useState(false);
   const [editBuffer, setEditBuffer] = React.useState({});
 
-  // Initialize edit buffer only when entering edit mode
-  const toggleEditMode = React.useCallback(() => {
-    setEditMode(prev => {
-      if (!prev) {
-        const buf = {};
-        editableFields.forEach(f => {
-          buf[f] = blockData[f] || '';
-        });
-        setEditBuffer(buf);
-      }
-      return !prev;
-    });
+  const editableKeys = React.useMemo(() => {
+    return Object.keys(blockData || {}).filter(k => typeof blockData[k] !== 'object');
   }, [blockData]);
 
-  // Memoized move handlers
+  React.useEffect(() => {
+    if (editMode && blockData) {
+      const buf = {};
+      editableKeys.forEach(key => {
+        buf[key] = blockData[key] || '';
+      });
+      setEditBuffer(buf);
+    }
+  }, [editMode, blockData, editableKeys]);
+
   const handleMoveUp = React.useCallback(() => {
     onMove(indexPath, 'up');
   }, [indexPath, onMove]);
@@ -49,20 +46,21 @@ const BlockTree = React.memo(function BlockTree({
     onMove(indexPath, 'down');
   }, [indexPath, onMove]);
 
-  // Field change handler - stable reference
   const handleFieldChange = React.useCallback((field, value) => {
     setEditBuffer(prev => ({ ...prev, [field]: value }));
   }, []);
 
-  // Save handler - stable reference
   const handleSave = React.useCallback(() => {
     setEditMode(false);
     onBlockEdit(indexPath, editBuffer);
   }, [editBuffer, indexPath, onBlockEdit]);
 
-  // Cancel handler - stable reference
   const handleCancel = React.useCallback(() => {
     setEditMode(false);
+  }, []);
+
+  const toggleEditMode = React.useCallback(() => {
+    setEditMode(prev => !prev);
   }, []);
 
   if (!blockData) return null;
@@ -72,27 +70,19 @@ const BlockTree = React.memo(function BlockTree({
   const canMoveDown = currentIndex < parentLength - 1;
 
   return (
-    <Card className={`${level > 0 ? `pl-${Math.min(level * 6, 24)}` : ''}`} variant="outlined">
+    <Card className={`my-2 border ${level > 0 ? `pl-${Math.min(level * 6, 24)}` : ''}`} variant="outlined">
       <CardContent>
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1">
             <Typography variant="subtitle1" fontWeight={600} className="text-blue-800">
               {blockId}
             </Typography>
             {typeof currentIndex === 'number' && typeof parentLength === 'number' && (
               <>
-                <IconButton
-                  size="small"
-                  onClick={handleMoveUp}
-                  disabled={!canMoveUp}
-                >
+                <IconButton size="small" onClick={handleMoveUp} disabled={!canMoveUp}>
                   <ArrowUpwardIcon fontSize="small" />
                 </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={handleMoveDown}
-                  disabled={!canMoveDown}
-                >
+                <IconButton size="small" onClick={handleMoveDown} disabled={!canMoveDown}>
                   <ArrowDownwardIcon fontSize="small" />
                 </IconButton>
               </>
@@ -107,43 +97,42 @@ const BlockTree = React.memo(function BlockTree({
             <IconButton size="small" onClick={toggleEditMode}><EditIcon /></IconButton>
           )}
         </div>
+
         <div className="flex flex-col gap-2 text-gray-800 text-sm mb-2">
           {editMode ? (
-            editableFields.map(field => (
+            editableKeys.map(key => (
               <TextField
-                key={field}
-                label={field.charAt(0).toUpperCase() + field.slice(1)}
-                value={editBuffer[field] || ''}
-                onChange={(e) => handleFieldChange(field, e.target.value)}
+                key={key}
+                label={key.charAt(0).toUpperCase() + key.slice(1)}
+                value={editBuffer[key]}
+                onChange={(e) => handleFieldChange(key, e.target.value)}
                 size="small"
-                className="w-64"
+                className="w-full"
               />
             ))
           ) : (
             Object.entries(blockData).map(([k, v]) => (
-              <span key={k}><b>{k}</b>: {String(v)};</span>
+              <span key={k}><b>{k}</b>: {typeof v === 'string' || typeof v === 'number' ? String(v) : '[object]'}</span>
             ))
           )}
         </div>
+
         {childarr.length > 0 && (
           <div>
-            {childarr.map((childId, idx) => {
-              const childBlock = childblocks[childId];
-              return (
-                <BlockTree
-                  key={childId}
-                  blockId={childId}
-                  blockData={childBlock?.info || {}}
-                  childarr={childBlock?.childarr || []}
-                  childblocks={childBlock?.childblocks || {}}
-                  level={level + 1}
-                  indexPath={[...indexPath, idx]}
-                  onBlockEdit={onBlockEdit}
-                  onMove={onMove}
-                  parentLength={childarr.length}
-                />
-              );
-            })}
+            {childarr.map((childId, idx) => (
+              <BlockTree
+                key={childId}
+                blockId={childId}
+                blockData={childblocks[childId]?.info || {}}
+                childarr={childblocks[childId]?.childarr || []}
+                childblocks={childblocks[childId]?.childblocks || {}}
+                level={level + 1}
+                indexPath={[...indexPath, idx]}
+                onBlockEdit={onBlockEdit}
+                onMove={onMove}
+                parentLength={childarr.length}
+              />
+            ))}
           </div>
         )}
       </CardContent>
@@ -152,20 +141,3 @@ const BlockTree = React.memo(function BlockTree({
 });
 
 export { BlockTree };
-
-// 2. BlockTree.jsx
-// Changes:
-
-// Optimized Edit Mode State:
-
-// Removed useEffect for initializing editBuffer (which caused extra renders).
-
-// Now initializes editBuffer only when entering edit mode (inside toggleEditMode).
-
-// Memoized All Handlers:
-
-// handleMoveUp, handleMoveDown, handleFieldChange, handleSave, handleCancel, and toggleEditMode are now wrapped in useCallback.
-
-// Efficient Child Rendering:
-
-// Extracted childBlock outside JSX to avoid recalculating it on every render.

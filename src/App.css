@@ -1,0 +1,28 @@
+/* styles/App.css */
+
+.three-panel {
+  display: flex;
+  height: 100vh;
+  font-family: Arial, sans-serif;
+}
+
+.panel {
+  padding: 16px;
+  overflow-y: auto;
+  border-right: 1px solid #ddd;
+}
+
+.panel-json {
+  width: 30%;
+  background-color: #f5f5f5;
+}
+
+.panel-editor {
+  width: 35%;
+  background-color: #fff;
+}
+
+.panel-preview {
+  width: 35%;
+  background-color: #f9f9f9;
+}
