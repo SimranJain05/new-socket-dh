@@ -30,7 +30,29 @@ export function convertToOrderBlocks(inputArr) {
   return { order, blocks };
 }
 
-// --- Move Utilities ---
+// --- Move/Delete Utilities ---
+/**
+ * Removes an item at a given index path from a nested array structure.
+ * @param {Array} arr
+ * @param {Array} path
+ * @returns {Array}
+ */
+export function removeItemInNestedArray(arr, path) {
+  if (path.length === 0) return arr;
+  const [head, ...rest] = path;
+  if (rest.length === 0) {
+    // Remove at this level
+    return arr.filter((_, idx) => idx !== head);
+  } else {
+    // Go deeper
+    return arr.map((item, idx) =>
+      idx === head
+        ? { ...item, children: removeItemInNestedArray(item.children || [], rest) }
+        : item
+    );
+  }
+}
+
 /**
  * Moves an item up or down in a nested array structure by index path.
  * @param {Array} arr
