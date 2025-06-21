@@ -31,7 +31,11 @@ export default function BlockOrderPage() {
   React.useEffect(() => {
     setJson(JSON.stringify(inputArr, null, 2));
   }, [inputArr]);
-
+   
+  //Purpose: Handles editing/updating of block properties (title, placeholder, help text, etc.)
+  // indexPath: Array of indices leading to the block to edit
+  // updatedFields: Object containing fields to update recieved from BlockTree.js
+  // Stable callback for block editing - now uses ref to avoid recreating on every render
   const onBlockEdit = useCallback((indexPath, updatedFields) => {
     setInputArr(prev =>
       updateByIndexPath(prev, indexPath, item => ({
@@ -41,13 +45,15 @@ export default function BlockOrderPage() {
     );
   }, []);
 
+
+  // Purpose: Handles reordering blocks (moving them up/down in the hierarchy)
+  // Stable callback for moving blocks - now uses ref to avoid recreating on every render
   const onMove = useCallback((indexPath, direction) => {
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
   }, []);
 
   return (
     <div className="flex w-full gap-4 p-4">
-      {/* Left Column */}
       <div className="w-1/2 mr-4">
         <h2 className="text-lg font-semibold mb-2">Editable inputData</h2>
         <div className="h-full">

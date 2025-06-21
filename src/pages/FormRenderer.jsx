@@ -1,6 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
-function renderField({ blockId, blockData, childarr, childblocks }) {
+// Utility function to evaluate visibility
+function isVisible(block, formValues) {
+  const cond = block.visibilityCondition;
+  if (!cond) return true; // agar jisme visiblity condition nhi hai key to yehi se true kr do 
+  console.log("dfgdsfg",formValues);
+  console.log("actual cond",cond.field) // -> device type
+  console.log("dfg",formValues[cond.field]); // in general compare through formValues  
+  return formValues[cond.field] === cond.value; // this cond.value is from inputData.js 
+}
+
+function renderField({
+  blockId,
+  blockData,
+  childarr,
+  childblocks,
+  formValues,
+  handleChange,
+}) {
   const {
     type,
     title,
@@ -9,8 +26,16 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
     required,
     defaultValue,
     inputType,
-    options
+    options,
+    id,
   } = blockData;
+
+  // Evaluate visibility
+  //formValues is the central state object that keeps track of all 
+  // the user inputs (like dropdowns, text fields, etc.) by their id. id se dekh raha hai 
+  if (!isVisible(blockData, formValues)) return null;
+
+  console.log("formvalues later",formValues)
 
   // For dynamic JS function placeholders
   if (typeof childarr === 'string' && childarr.includes('function')) {
@@ -24,8 +49,7 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
     );
   }
 
-  // Input fields
-  if (['input', 'email', 'tel', 'text'].includes(type)) {
+  if (["input", "email", "tel", "text"].includes(type)) {
     return (
       <div key={blockId} className="mb-4">
         <label className="block font-medium mb-1">
@@ -35,7 +59,8 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
           type={inputType || type}
           placeholder={placeholder}
           required={required}
-          defaultValue={defaultValue}
+          value={formValues[id] || ""}
+          onChange={(e) => handleChange(id, e.target.value)}
           className="w-full border px-3 py-2 rounded shadow-sm"
         />
         {help && <p className="text-sm text-gray-500 mt-1">{help}</p>}
@@ -43,19 +68,39 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
     );
   }
 
-  // Dropdown field
-  if (type === 'dropdown') {
+  if (type === "dropdown") {
+    let finalOptions = options || [];
+    let shouldRender = true;
+   console.log("inside",blockData.dependsOn)
+    // Handle dependent dropdowns
+    if (blockData.dependsOn) {
+      const { field, optionsMap } = blockData.dependsOn;
+      const selectedValue = formValues[field];   // formValues["countryName"]
+
+      if (!selectedValue) {
+        shouldRender = false; // nothing selected yet => don't show state dropdown
+      } else {
+        finalOptions = optionsMap[selectedValue] || []; // Get MP/UP or California/Texas
+      }
+    }
+
+    if (!shouldRender) return null;
+
     return (
       <div key={blockId} className="mb-4">
         <label className="block font-medium mb-1">
           {title} {required && <span className="text-red-500">*</span>}
         </label>
         <select
-          defaultValue={defaultValue}
           required={required}
+          value={formValues[id] || ""}
+          onChange={(e) => handleChange(id, e.target.value, blockData)}
           className="w-full border px-3 py-2 rounded shadow-sm"
         >
-          {options?.map((opt, idx) => (
+          <option value="" disabled>
+            Select an option
+          </option>
+          {finalOptions?.map((opt, idx) => (   // represeting the options of the dropdown
             <option key={idx} value={opt.value}>
               {opt.label}
             </option>
@@ -66,8 +111,7 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
     );
   }
 
-  // Input group with children
-  if (type === 'input_group') {
+  if (type === "input_group") {
     return (
       <fieldset
         key={blockId}
@@ -81,6 +125,8 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
             blockData: childblocks[childId].info,
             childarr: childblocks[childId].childarr,
             childblocks: childblocks[childId].childblocks,
+            formValues,
+            handleChange,
           })
         )}
       </fieldset>
@@ -91,6 +137,33 @@ function renderField({ blockId, blockData, childarr, childblocks }) {
 }
 
 export default function FormRenderer({ blocks, order }) {
+  const [formValues, setFormValues] = useState({});
+
+  const handleChange = useCallback((id, value, blockData = {}) => {
+    setFormValues((prev) => {     // here stores the values
+      const updated = { ...prev, [id]: value };
+
+      // Reset dependent dropdown when parent changes
+      if (id === "countryName") {
+        updated["stateName"] = ""; // clears the selection here
+      }
+
+      return updated;
+    });
+  }, []);
+   // formValues is calculated inside this FormRender which runs for every field
+  useEffect(() => {   // populating default Values inside Form Builder
+    const defaults = {};
+    for (const blockId of order) {
+      const block = blocks[blockId];
+      const { id, defaultValue } = block.info;
+      if (id && defaultValue !== undefined) {
+        defaults[id] = defaultValue;
+      }
+    }
+    setFormValues((prev) => ({ ...defaults, ...prev }));
+  }, [blocks, order]);
+
   return (
     <form className="w-full p-4">
       {order.map((blockId) => {
@@ -100,6 +173,8 @@ export default function FormRenderer({ blocks, order }) {
           blockData: block.info,
           childarr: block.childarr,
           childblocks: block.childblocks,
+          formValues,
+          handleChange,
         });
       })}
     </form>

@@ -11,6 +11,61 @@ export const input = [
     "children": []
   },
   {
+    "id": "countryName",
+    "type": "dropdown",
+    "title": "Country",
+    "options": [
+      { "label": "India", "value": "India" },
+      { "label": "USA", "value": "USA" }
+    ],
+    "defaultValue": "",
+    "children": []
+  },
+  {
+    "id": "stateName",
+    "type": "dropdown",
+    "title": "State",
+    "options": [], // Will be set dynamically
+    "dependsOn": {
+      "field": "countryName",
+      "optionsMap": {
+        "India": [
+          { "label": "MP", "value": "MP" },
+          { "label": "UP", "value": "UP" }
+        ],
+        "USA": [
+          { "label": "California", "value": "California" },
+          { "label": "Texas", "value": "Texas" }
+        ]
+      }
+    },
+    "children": []
+  },
+  {
+    "id": "deviceType",
+    "type": "dropdown",
+    "title": "Select Device Type",
+    "options": [
+      { "label": "Laptop", "value": "laptop" },
+      { "label": "Mobile", "value": "mobile" },
+      { "label": "Others", "value": "others" }
+    ],
+    "defaultValue": "mobile",
+    "children": []
+  },
+  {
+    "id": "modelName",
+    "type": "input",
+    "title": "Laptop Model",
+    "placeholder": "Enter model name",
+    "required": false,
+    "visibilityCondition": {
+      "field": "deviceType", // stores Id of deviceType dropdown
+      "value": "laptop"
+    },
+    "children": []
+  },
+  {
     "placeholder": "Enter your email",
     "title": "Email Address",
     "help": "We’ll send updates to this email",
@@ -92,5 +147,36 @@ export const input = [
         ]
       }
     ]
-  }
-];
+  },
+ 
+ ];
+
+
+
+
+// export const input = [
+//   // {
+//   //   "id": "deviceType",
+//   //   "type": "dropdown",
+//   //   "title": "Select Device Type",
+//   //   "options": [
+//   //     { "label": "Laptop", "value": "laptop" },
+//   //     { "label": "Mobile", "value": "mobile" },
+//   //     { "label": "Others", "value": "others" }
+//   //   ],
+//   //   "defaultValue": "mobile",
+//   //   "children": []
+//   // },
+//   // {
+//   //   "id": "modelName",
+//   //   "type": "input",
+//   //   "title": "Laptop Model",
+//   //   "placeholder": "Enter model name",
+//   //   "required": false,
+//   //   "visibilityCondition": {
+//   //     "field": "deviceType",
+//   //     "value": "laptop"
+//   //   },
+//   //   "children": []
+//   // }
+// ];

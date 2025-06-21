@@ -66,7 +66,7 @@ function BlockTree({
   const currentIndex = indexPath[indexPath.length - 1];
   const canMoveUp = currentIndex > 0;
   const canMoveDown = currentIndex < parentLength - 1;
-
+  console.log("BlocksData",blockData)
   return (
     <Card className={`${level > 0 ? `pl-${Math.min(level * 6, 24)}` : ''}`} variant="outlined">
       <CardContent>
@@ -117,9 +117,13 @@ function BlockTree({
                 />
               ))
             ) : (
+
+
               Object.entries(blockData).map(([k, v]) => (
                 <span key={k}><b>{k}</b>: {String(v)};</span>
               ))
+
+
             )}
           </div>
           {childarr.length > 0 && (
