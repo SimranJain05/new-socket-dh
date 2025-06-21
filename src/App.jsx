@@ -1,12 +1,12 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import BlockOrderPage from './pages/BlockOrderPage.jsx';
+import ConfigurationPage from './pages/ConfigurationPage.jsx';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<BlockOrderPage />} />
+        <Route path="/" element={<ConfigurationPage />} />
       </Routes>
     </BrowserRouter>
   );
