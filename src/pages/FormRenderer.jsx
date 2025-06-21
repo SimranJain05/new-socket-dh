@@ -75,13 +75,8 @@ function renderField({
     // Handle dependent dropdowns
     if (blockData.dependsOn) {
       const { field, optionsMap } = blockData.dependsOn;
-      const selectedValue = formValues[field];   // formValues["countryName"]
-
-      if (!selectedValue) {
-        shouldRender = false; // nothing selected yet => don't show state dropdown
-      } else {
-        finalOptions = optionsMap[selectedValue] || []; // Get MP/UP or California/Texas
-      }
+      const selectedValue = formValues[field];
+      finalOptions = selectedValue && optionsMap[selectedValue] ? optionsMap[selectedValue] : [];
     }
 
     if (!shouldRender) return null;
@@ -92,20 +87,20 @@ function renderField({
           {title} {required && <span className="text-red-500">*</span>}
         </label>
         <select
-          required={required}
-          value={formValues[id] || ""}
-          onChange={(e) => handleChange(id, e.target.value, blockData)}
-          className="w-full border px-3 py-2 rounded shadow-sm"
-        >
-          <option value="" disabled>
-            Select an option
-          </option>
-          {finalOptions?.map((opt, idx) => (   // represeting the options of the dropdown
-            <option key={idx} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+  required={required}
+  value={formValues[id] || ""}
+  onChange={(e) => handleChange(id, e.target.value, blockData)}
+  className="w-full border px-3 py-2 rounded shadow-sm"
+>
+  <option value="" disabled>
+    {finalOptions.length === 0 ? "No options available" : "Select an option"}
+  </option>
+  {finalOptions.map((opt, idx) => (
+    <option key={idx} value={opt.value}>
+      {opt.label}
+    </option>
+  ))}
+</select>
         {help && <p className="text-sm text-gray-500 mt-1">{help}</p>}
       </div>
     );
