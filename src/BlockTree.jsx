@@ -4,15 +4,15 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import EditIcon from '@mui/icons-material/Edit';
+import EditIcon from '@mui/icons-material/Edit'; // Pencil icon
 import SaveIcon from '@mui/icons-material/Check';
 import CancelIcon from '@mui/icons-material/Close';
 import TextField from '@mui/material/TextField';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'; // Import for Duplicate
-import DeleteIcon from '@mui/icons-material/Delete'; // Import for Delete
-import InputBuilder from './components/InputBuilder'; // Still needed for nested adding
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
+import InputBuilder from './components/InputBuilder';
 
 const editableFields = ['title', 'placeholder', 'help']; // These are the fields currently editable inline
 
@@ -25,21 +25,22 @@ function BlockTree({
   indexPath = [],
   onBlockEdit,
   onMove,
-  onBlockDelete, // New prop
-  onBlockDuplicate, // New prop
-  onAddField, // New prop (for nested adds)
+  onBlockDelete,
+  onBlockDuplicate,
+  onAddField,
+  onOpenInputBuilderForEdit,
   parentLength
 }) {
   const [editMode, setEditMode] = useState(false);
-  const [editBuffer, setEditBuffer] = useState({});
+  // Ensure editBuffer is always an object
+  const [editBuffer, setEditBuffer] = useState({}); // Initialize as an empty object
 
-  // Initialize edit buffer only when entering edit mode
   const toggleEditMode = useCallback(() => {
     setEditMode(prev => {
       if (!prev) {
         const buf = {};
         editableFields.forEach(f => {
-          buf[f] = blockData[f] || '';
+          buf[f] = blockData?.[f] || ''; // Add safe navigation
         });
         setEditBuffer(buf);
       }
@@ -69,25 +70,25 @@ function BlockTree({
   }, []);
 
   const handleDelete = useCallback(() => {
-    if (window.confirm(`Are you sure you want to delete field "${blockData.title || blockId}"?`)) {
+    if (window.confirm(`Are you sure you want to delete field "${blockData?.title || blockId}"?`)) { // Added safe navigation
       onBlockDelete(indexPath);
     }
-  }, [indexPath, onBlockDelete, blockData.title, blockId]);
+  }, [indexPath, onBlockDelete, blockData?.title, blockId]); // Added safe navigation
 
   const handleDuplicate = useCallback(() => {
     onBlockDuplicate(indexPath);
   }, [indexPath, onBlockDuplicate]);
 
-  // This will be for opening a comprehensive edit dialog, potentially using InputBuilder
-  // For now, it just logs, as InputBuilder itself needs modification to support an "edit" mode
   const handleFullEdit = useCallback(() => {
-    console.log("Full edit triggered for field:", blockId, blockData);
-    // TODO: Open InputBuilder dialog pre-filled with blockData for full editing
-    // This would involve passing blockData to InputBuilder and changing its behavior based on a prop.
-  }, [blockId, blockData]);
+    onOpenInputBuilderForEdit(indexPath, blockData);
+  }, [blockData, indexPath, onOpenInputBuilderForEdit]);
 
+  // --- FIX APPLIED HERE ---
+  // Ensure blockData is an object before iterating over it.
+  // If blockData is null or undefined, default to an empty object.
+  const displayBlockData = blockData || {};
 
-  if (!blockData) return null;
+  if (!blockData) return null; // If no blockData, don't render anything
 
   const currentIndex = indexPath[indexPath.length - 1];
   const canMoveUp = currentIndex > 0;
@@ -121,85 +122,49 @@ function BlockTree({
                 </>
               )}
             </div>
-            {/* Action buttons as per UI image */}
             <div>
-              {editMode ? (
-                <>
-                  <IconButton size="small" onClick={handleSave} color="primary"><SaveIcon /></IconButton>
-                  <IconButton size="small" onClick={handleCancel}><CancelIcon /></IconButton>
-                </>
-              ) : (
-                <>
-                  {/* The main "Edit" button, ideally opens a full InputBuilder dialog */}
-                  <IconButton size="small" onClick={handleFullEdit}><EditIcon /></IconButton>
-                  <IconButton size="small" onClick={handleDuplicate}><ContentCopyIcon fontSize="small" /></IconButton>
-                  <IconButton size="small" onClick={handleDelete}><DeleteIcon fontSize="small" color="error" /></IconButton>
-                </>
-              )}
+              <IconButton size="small" onClick={handleFullEdit}><EditIcon /></IconButton>
+              <IconButton size="small" onClick={handleDuplicate}><ContentCopyIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={handleDelete}><DeleteIcon fontSize="small" color="error" /></IconButton>
             </div>
           </div>
           <div className="flex flex-col gap-2 text-gray-800 text-sm mb-2">
-            {editMode ? (
-              editableFields.map(field => (
-                <TextField
-                  key={field}
-                  label={field.charAt(0).toUpperCase() + field.slice(1)}
-                  value={editBuffer[field] || ''}
-                  onChange={(e) => handleFieldChange(field, e.target.value)}
-                  size="small"
-                  className="w-64"
-                />
-              ))
-            ) : (
-              // Display all relevant blockData properties
-              Object.entries(blockData).map(([k, v]) => {
-                if (k === 'children' && (Array.isArray(v) && v.length === 0 || typeof v === 'string')) return null; // Don't display empty children or dynamic children string here
-                if (k === 'options' && Array.isArray(v)) {
-                    return <span key={k}><b>{k}</b>: {v.map(opt => `${opt.label}:${opt.value}`).join(', ')};</span>;
-                }
-                if (k === 'dynamicChildren' || k === 'dynamicOptions') {
-                    return <span key={k}><b>{k}</b>: <code style={{backgroundColor: '#eee', padding: '2px 4px', borderRadius: '3px'}}>{String(v)}</code>;</span>;
-                }
-                return <span key={k}><b>{k}</b>: {String(v)};</span>;
-              })
-            )}
+            {/* Iterating over displayBlockData which is guaranteed to be an object */}
+            {Object.entries(displayBlockData).map(([k, v]) => {
+              if (k === 'children' && (Array.isArray(v) && v.length === 0 || typeof v === 'string')) return null;
+              if (k === 'options' && Array.isArray(v)) {
+                  return <span key={k}><b>{k}</b>: {v.map(opt => `${opt.label}:${opt.value}`).join(', ')};</span>;
+              }
+              if (k === 'dynamicChildren' || k === 'dynamicOptions') {
+                  return <span key={k}><b>{k}</b>: <code style={{backgroundColor: '#eee', padding: '2px 4px', borderRadius: '3px'}}>{String(v)}</code>;</span>;
+              }
+              if (k === 'label' && displayBlockData.title) return null; // Use displayBlockData here too
+              return <span key={k}><b>{k}</b>: {String(v)};</span>;
+            })}
           </div>
           {childarr.length > 0 && (
-            <div className="mt-2" style={{ borderLeft: '2px solid #ddd', paddingLeft: '8px', marginLeft: '4px' }}> {/* Visual nesting */}
-              <div className="mb-2">
-                <InputBuilder
-                  onAddField={onAddField} // Use the new onAddField for nested additions
-                  parentPath={indexPath}
-                />
-              </div>
+            <div className="mt-2" style={{ borderLeft: '2px solid #ddd', paddingLeft: '8px', marginLeft: '4px' }}>
               {childarr.map((childId, idx) => {
                 const childBlock = childblocks[childId];
                 return (
                   <MemoizedBlockTree
                     key={childId}
                     blockId={childId}
-                    blockData={childBlock?.info || {}}
+                    blockData={childBlock?.info || {}} // Ensure this fallback to empty object is always active
                     childarr={childBlock?.childarr || []}
                     childblocks={childBlock?.childblocks || {}}
                     level={level + 1}
                     indexPath={[...indexPath, idx]}
                     onBlockEdit={onBlockEdit}
                     onMove={onMove}
-                    onBlockDelete={onBlockDelete} // Pass through
-                    onBlockDuplicate={onBlockDuplicate} // Pass through
-                    onAddField={onAddField} // Pass through for deeper nesting
+                    onBlockDelete={onBlockDelete}
+                    onBlockDuplicate={onBlockDuplicate}
+                    onAddField={onAddField}
+                    onOpenInputBuilderForEdit={onOpenInputBuilderForEdit}
                     parentLength={childarr.length}
                   />
                 );
               })}
-            </div>
-          )}
-          {blockData.type === 'input_group' && childarr.length === 0 && (
-            <div className="mt-2">
-              <InputBuilder
-                onAddField={onAddField} // Use the new onAddField for adding to empty input groups
-                parentPath={indexPath}
-              />
             </div>
           )}
         </div>
@@ -209,7 +174,15 @@ function BlockTree({
 }
 
 const MemoizedBlockTree = React.memo(BlockTree, (prevProps, nextProps) => {
-  return isEqual(prevProps, nextProps);
+  return (
+    prevProps.blockId === nextProps.blockId &&
+    prevProps.level === nextProps.level &&
+    prevProps.parentLength === nextProps.parentLength &&
+    isEqual(prevProps.blockData, nextProps.blockData) &&
+    isEqual(prevProps.childarr, nextProps.childarr) &&
+    isEqual(prevProps.childblocks, nextProps.childblocks) &&
+    isEqual(prevProps.indexPath, nextProps.indexPath)
+  );
 });
 
 export { BlockTree, MemoizedBlockTree };

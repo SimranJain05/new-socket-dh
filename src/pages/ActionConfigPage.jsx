@@ -28,6 +28,8 @@ import {
 
 import BlockOrderPage from './BlockOrderPage.jsx';
 import InputBuilder from '../components/InputBuilder';
+import { updateByIndexPath } from '../utils.js';
+import { input } from '../inputData.js'; // Import the initial input data
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -39,7 +41,7 @@ function TabPanel(props) {
       id={`simple-tabpanel-${index}`}
       aria-labelledby={`simple-tab-${index}`}
       {...other}
-      style={{ height: '100%',width:'200', display: 'flex', flexDirection: 'column' }}
+      style={{ height: '100%', width: '200', display: 'flex', flexDirection: 'column' }}
     >
       {value === index && (
         <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -60,17 +62,15 @@ function a11yProps(index) {
 export default function ActionConfigPage() {
   const [activeTab, setActiveTab] = useState(1);
   const [inputMode, setInputMode] = useState('form');
-  const [fields, setFields] = useState([
-    { id: 'email', type: 'TextField', label: 'Send Email to', required: true },
-    { id: 'connection', type: 'Select', label: 'Select Connection', options: [] }
-  ]);
-  const [jsonData, setJsonData] = useState({ fields: [] });
+  const [fields, setFields] = useState(input); // Initialize with inputData
   const [selectedFieldId, setSelectedFieldId] = useState(null);
 
   // State for the InputBuilder dialog
   const [isInputBuilderOpen, setIsInputBuilderOpen] = useState(false);
-  const [inputBuilderParentPath, setInputBuilderParentPath] = useState([]);
+  // This path will be the exact indexPath for EDITING, or parentPath for ADDING
+  const [inputBuilderContextPath, setInputBuilderContextPath] = useState([]);
   const [inputBuilderInitialData, setInputBuilderInitialData] = useState(null);
+  const [dialogMode, setDialogMode] = useState('add'); // 'add' or 'edit'
 
   // Keyboard navigation for moving fields
   useEffect(() => {
@@ -91,13 +91,6 @@ export default function ActionConfigPage() {
           } else if (direction === 'down' && index < newFields.length - 1) {
             [newFields[index], newFields[index + 1]] = [newFields[index + 1], newFields[index]];
           }
-
-          // Update JSON data to reflect the changes
-          setJsonData(prev => ({
-            ...prev,
-            fields: newFields
-          }));
-
           return newFields;
         });
       }
@@ -107,11 +100,6 @@ export default function ActionConfigPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedFieldId]);
 
-  // Sync JSON data with fields
-  useEffect(() => {
-    setJsonData(prev => ({ ...prev, fields }));
-  }, [fields]);
-
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
@@ -120,20 +108,27 @@ export default function ActionConfigPage() {
     setInputMode(event.target.value);
   };
 
+  // Opens InputBuilder for ADDING a NEW field (from left panel or as sub-field)
   const handleOpenInputBuilderForAdd = useCallback((parentPath = []) => {
-    setInputBuilderInitialData(null);
-    setInputBuilderParentPath(parentPath);
+    setInputBuilderInitialData(null); // No initial data for adding
+    setInputBuilderContextPath(parentPath); // Path to the parent where new field will be added
+    setDialogMode('add');
     setIsInputBuilderOpen(true);
   }, []);
 
+  // Opens InputBuilder for EDITING an EXISTING field (from middle panel pencil icon)
   const handleOpenInputBuilderForEdit = useCallback((indexPath, fieldData) => {
-    setInputBuilderInitialData(fieldData);
-    setInputBuilderParentPath(indexPath.slice(0, -1));
+    setInputBuilderInitialData(fieldData); // Pass existing field data
+    setInputBuilderContextPath(indexPath); // This is the exact path to the item being edited
+    setDialogMode('edit');
     setIsInputBuilderOpen(true);
   }, []);
 
   const handleCloseInputBuilder = useCallback(() => {
     setIsInputBuilderOpen(false);
+    setInputBuilderInitialData(null); // Clear initial data on close
+    setInputBuilderContextPath([]); // Clear path on close
+    setDialogMode('add'); // Reset dialog mode to default
   }, []);
 
   const [addFieldForm, setAddFieldForm] = useState({
@@ -149,25 +144,63 @@ export default function ActionConfigPage() {
     const newField = {
       id: addFieldForm.id,
       type: addFieldForm.type,
-      label: addFieldForm.title,
+      label: addFieldForm.title, // 'label' for form components
+      title: addFieldForm.title, // 'title' for display in BlockTree
       required: addFieldForm.required,
       placeholder: addFieldForm.placeholder,
-      defaultValue: addFieldForm.defaultValue
+      defaultValue: addFieldForm.defaultValue,
+      children: []
     };
-
+    // Directly add to root for the simple form
     setFields(prev => [...prev, newField]);
     setAddFieldForm({
       title: '', placeholder: '', help: '', id: '', defaultValue: '', required: false, type: 'TextField'
     });
   };
 
-  const handleFieldReorder = (updatedFields) => {
-    setFields(updatedFields);
-    setJsonData(prev => ({
-      ...prev,
-      fields: updatedFields
-    }));
-  };
+  // This handler is now used by InputBuilder (when submitting its internal form)
+  // It receives the current contextPath (either edit path or parent add path)
+  const handleInputBuilderSubmit = useCallback((submittedPath, fieldData, mode) => {
+    const processedField = {
+        id: fieldData.id,
+        type: fieldData.type,
+        title: fieldData.title, // Use title for display
+        label: fieldData.label, // Use label for form components
+        help: fieldData.help,
+        required: fieldData.required,
+        placeholder: fieldData.placeholder,
+        defaultValue: fieldData.defaultValue,
+        options: fieldData.options,
+        dynamicOptions: fieldData.dynamicOptions,
+        dynamicChildren: fieldData.dynamicChildren,
+        children: fieldData.children || [], // Ensure children is always an array
+    };
+
+    setFields(prevFields => {
+        if (mode === 'edit') {
+            // 'submittedPath' is the indexPath of the item being edited
+            return updateByIndexPath(prevFields, submittedPath, () => processedField);
+        } else if (mode === 'add' || mode === 'add-child') {
+            // 'submittedPath' is the parentPath where the new field should be added
+            if (submittedPath.length === 0) {
+                // Adding to root
+                return [...prevFields, processedField];
+            } else {
+                // Adding as a child
+                return updateByIndexPath(prevFields, submittedPath, (parent) => {
+                    const currentChildren = Array.isArray(parent.children) ? parent.children : [];
+                    return {
+                        ...parent,
+                        children: [...currentChildren, processedField],
+                    };
+                });
+            }
+        }
+        return prevFields; // Should not happen
+    });
+    handleCloseInputBuilder();
+}, [handleCloseInputBuilder]);
+
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden', bgcolor: '#f5f5f5' }}>
@@ -191,20 +224,16 @@ export default function ActionConfigPage() {
         <Box sx={{ flexGrow: 1, display: 'flex', overflow: 'hidden' }}>
           <TabPanel value={activeTab} index={0}>
             <Typography variant="h6">Overview Content</Typography>
-            <Box sx={{p:2}}>
+            <Box sx={{ p: 2 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
                 Show dropdown for selecting options instead or blowing all options on occasion
               </Typography>
             </Box>
           </TabPanel>
 
-          {/* START OF MODIFIED SECTION FOR JSON EDITOR HEIGHT */}
-          {/* This Box is the main content area for the tab, it needs to be a flex column */}
-          <TabPanel value={activeTab} index={1} sx={{ p: 0 }}> {/* p:0 here allows its child Box to manage padding */}
-            {/* Inner Box to manage padding and flex layout for content */}
-            <Box sx={{ flex: 1, width:'150%',display: 'flex', flexDirection: 'column', p: 2, overflowY: 'auto' }}>
+          <TabPanel value={activeTab} index={1} sx={{ p: 0 }}>
+            <Box sx={{ flex: 1, width: '150%', display: 'flex', flexDirection: 'column', p: 2, overflowY: 'auto' }}>
 
-              {/* Common Header for Add Field and Radio buttons - Always visible */}
               <Paper variant="outlined" sx={{ p: 2, mb: 2, flexShrink: 0 }}>
                 <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 1 }}>Add field</Typography>
                 <RadioGroup row value={inputMode} onChange={handleInputModeChange} sx={{ mb: 2 }}>
@@ -295,7 +324,7 @@ export default function ActionConfigPage() {
                       variant="outlined"
                       color="primary"
                       startIcon={<AddIcon />}
-                      onClick={() => handleOpenInputBuilderForAdd([])}
+                      onClick={() => handleOpenInputBuilderForAdd([])} // Open for root-level add
                       sx={{ mt: 1 }}
                     >
                       Advanced Field Options
@@ -305,72 +334,49 @@ export default function ActionConfigPage() {
 
                     <Typography variant="caption" sx={{ mt: 2, mb: 1, display: 'block' }}>Field Types (Click to Add / Expand)</Typography>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>Date picker</Button>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>Checkbox</Button>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>Radio Group</Button>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>Input Group</Button>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>Attachment</Button>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>TextArea</Button>
-                      <Button variant="outlined" sx={{justifyContent: 'flex-start'}} disableRipple endIcon={<ExpandMoreIcon />}>Dropdown</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>Date picker</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>Checkbox</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>Radio Group</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>Input Group</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>Attachment</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>TextArea</Button>
+                      <Button variant="outlined" sx={{ justifyContent: 'flex-start' }} disableRipple endIcon={<ExpandMoreIcon />}>Dropdown</Button>
                     </div>
                   </Box>
                 </Paper>
               )}
 
-               {/* START OF MODIFIED JSON MODE BLOCK */}
-                  {inputMode === 'json' && (
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        // KEY CHANGES:
-                        flexGrow: 1, // 1. Allow this Paper to grow and fill available vertical space.
-                        display: 'flex', // 2. Use flexbox for its direct children.
-                        flexDirection: 'column', // 3. Arrange children vertically.
-                        overflow: 'hidden', // 4. Prevent this Paper itself from scrolling.
-                        p: 2, // Keep your original padding
-                      }}
-                    >
-                      {/* Child 1: The header text (will not grow) */}
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, flexShrink: 0 }}>
-                        Edit raw JSON for adding fields.
-                      </Typography>
+              {inputMode === 'json' && (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    flexGrow: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    p: 2,
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1, flexShrink: 0 }}>
+                    Edit raw JSON for adding fields.
+                  </Typography>
 
-                      {/* Child 2: A wrapper Box for the editor (this is what will grow) */}
-                      <Box sx={{
-                        flexGrow: 1, // This Box takes all the space between the text and the button.
-                        overflow: 'hidden', // Hide overflow
-                        border: '1px solid #ddd', // Optional: adds a border around the editor area
-                        borderRadius: 1
-                      }}>
-                        <BlockOrderPage
-                          showJsonEditorOnly={true}
-                          jsonData={jsonData}
-                          onJsonChange={setJsonData}
-                        />
-                      </Box>
-
-                      {/* Child 3: The footer button (will not grow) */}
-                      <Button
-                        variant="contained"
-                        sx={{ mt: 2, flexShrink: 0 }}
-                        onClick={() => {
-                          try {
-                            if (jsonData.fields) {
-                              setFields(jsonData.fields);
-                            }
-                          } catch (err) {
-                            console.error('Error updating fields from JSON', err);
-                          }
-                        }}
-                      >
-                        Update Fields from JSON
-                      </Button>
-                    </Paper>
-                  )}
-                  {/* END OF MODIFIED JSON MODE BLOCK */}
+                  <Box sx={{
+                    flexGrow: 1,
+                    overflow: 'hidden',
+                    border: '1px solid #ddd',
+                    borderRadius: 1
+                  }}>
+                    <BlockOrderPage
+                      showJsonEditorOnly={true}
+                      fields={fields}
+                      onFieldsChange={setFields}
+                    />
                   </Box>
+                </Paper>
+              )}
+            </Box>
           </TabPanel>
-          {/* END OF MODIFIED SECTION */}
 
           <TabPanel value={activeTab} index={2}>
             <Box sx={{ height: '100%', width: '100%', p: 2 }}>
@@ -393,8 +399,7 @@ export default function ActionConfigPage() {
             selectedFieldId={selectedFieldId}
             onSelectField={setSelectedFieldId}
             onFieldsChange={setFields}
-            jsonData={jsonData}
-            onJsonChange={setJsonData}
+            onOpenInputBuilderForEdit={handleOpenInputBuilderForEdit} // Pass the handler for full editing
           />
         </Box>
       </Box>
@@ -443,25 +448,14 @@ export default function ActionConfigPage() {
 
       {/* InputBuilder Dialog */}
       <Dialog open={isInputBuilderOpen} onClose={handleCloseInputBuilder} maxWidth="sm" fullWidth>
-        <DialogTitle>{inputBuilderInitialData ? 'Edit Field' : 'Add New Field'}</DialogTitle>
+        <DialogTitle>{dialogMode === 'edit' ? 'Edit Field' : 'Add New Field'}</DialogTitle>
         <DialogContent>
           <InputBuilder
-            onAddField={(path, field) => {
-              const newField = {
-                id: field.id,
-                type: field.type,
-                label: field.label,
-                required: field.required,
-                placeholder: field.placeholder,
-                defaultValue: field.defaultValue,
-                options: field.options
-              };
-
-              setFields(prev => [...prev, newField]);
-              handleCloseInputBuilder();
-            }}
-            parentPath={inputBuilderParentPath}
+            onSubmit={handleInputBuilderSubmit} // Unified submit handler
+            onOpenAddDialog={handleOpenInputBuilderForAdd} // Prop for InputBuilder to request a new ADD dialog
+            contextPath={inputBuilderContextPath} // Path for current operation (edit path or add parent path)
             initialData={inputBuilderInitialData}
+            mode={dialogMode} // Pass the mode to InputBuilder ('add' or 'edit')
           />
         </DialogContent>
         <DialogActions>

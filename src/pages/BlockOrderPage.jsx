@@ -1,91 +1,103 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { input } from '../inputData.js';
 import { convertToOrderBlocks, moveItemInNestedArray, updateByIndexPath } from '../utils.js';
 import { MemoizedBlockTree } from '../BlockTree.jsx';
 import JsonEditor from '../components/JsonEditor.jsx';
-import InputBuilder from '../components/InputBuilder'; // Ensure InputBuilder is imported
+import isEqual from 'lodash.isequal';
+// import { Button } from '@mui/material'; // No longer needed as the direct button is removed
 
-export default function BlockOrderPage({ showJsonEditorOnly = false }) { // Removed onAddField prop from here, it's handled internally now
-  const [json, setJson] = useState(JSON.stringify(input, null, 2));
-  const [inputArr, setInputArr] = useState(input);
+// Accept fields and onFieldsChange from parent, and also onOpenInputBuilderForEdit
+export default function BlockOrderPage({
+  showJsonEditorOnly = false,
+  fields,
+  onFieldsChange,
+  onOpenInputBuilderForEdit,
+}) {
+  const currentFields = fields || input;
+
+  const [json, setJson] = useState(() => JSON.stringify(currentFields, null, 2));
   const [error, setError] = useState(null);
 
-  // Memoized result to prevent recalculation
-  // Purpose: Converts input array to order + blocks structure
-  // Returns: { order: [blockIds], blocks: { [blockId]: { info, childarr, childblocks } } }
-  const result = useMemo(() => convertToOrderBlocks(inputArr), [inputArr]);
+  useEffect(() => {
+    try {
+      const newJson = JSON.stringify(currentFields, null, 2);
+      if (newJson !== json) {
+        setJson(newJson);
+        setError(null);
+      }
+    } catch (e) {
+      console.error("Error stringifying fields to JSON:", e);
+      setError("Error converting fields to JSON for display.");
+    }
+  }, [currentFields]);
 
-  // Stable callback for JSON changes
+  const result = useMemo(() => convertToOrderBlocks(currentFields), [currentFields]);
+
   const handleJsonChange = useCallback((val) => {
     setJson(val);
-  }, []);
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed) && !isEqual(parsed, currentFields)) {
+        onFieldsChange(parsed);
+        setError(null);
+      }
+    } catch (e) {
+      setError('Invalid JSON format. Please correct it to see changes reflected.');
+    }
+  }, [currentFields, onFieldsChange]);
 
-  // Stable callback for JSON validation
   const handleJsonBlur = useCallback(() => {
     try {
       const parsed = JSON.parse(json);
-      setInputArr(parsed);
-      setError(null);
+      if (Array.isArray(parsed) && !isEqual(parsed, currentFields)) {
+        onFieldsChange(parsed);
+        setError(null);
+      } else if (!Array.isArray(parsed)) {
+         setError('JSON must be an array of field objects.');
+      }
     } catch (e) {
-      setError('Invalid JSON');
+      setError('Invalid JSON format.');
     }
-  }, [json]);
+  }, [json, currentFields, onFieldsChange]);
 
 
-  // Sync the navigation movements up/down from GUI with the input array
-  React.useEffect(() => {
-    setJson(JSON.stringify(inputArr, null, 2));
-  }, [inputArr]);
-
-  //Purpose: Handles editing/updating of block properties (title, placeholder, help text, etc.)
-  // indexPath: Array of indices leading to the block to edit
-  // updatedFields: Object containing fields to update recieved from BlockTree.js
-  // Stable callback for block editing - now uses ref to avoid recreating on every render
+  // onBlockEdit is now effectively unused as the pencil icon opens the full dialog
   const onBlockEdit = useCallback((indexPath, updatedFields) => {
-    setInputArr(prev =>
+    onFieldsChange(prev =>
       updateByIndexPath(prev, indexPath, item => ({
         ...item,
         ...updatedFields
       }))
     );
-  }, []);
+  }, [onFieldsChange]);
 
-  // Purpose: Handles reordering blocks (moving them up/down in the hierarchy)
-  // Stable callback for moving blocks - now uses ref to avoid recreating on every render
   const onMove = useCallback((indexPath, direction) => {
-    setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
-  }, []);
+    onFieldsChange(prev => moveItemInNestedArray(prev, indexPath, direction));
+  }, [onFieldsChange]);
 
-  // New function to add a field, wrapping the existing updateByIndexPath
+  // The onAddField from BlockTree for nested additions is now handled by the InputBuilder's onSubmit
+  // (via a new 'mode' flag)
   const onAddField = useCallback((parentPath, newField) => {
-    setInputArr(prev => {
-      if (parentPath.length === 0) {
-        // Add to the root level
-        return [...prev, newField];
-      } else {
-        // Add as a child to an existing item at parentPath
-        return updateByIndexPath(prev, parentPath, (item) => {
-          // Ensure 'children' is an array before pushing
-          const currentChildren = Array.isArray(item.children) ? item.children : [];
-          return {
-            ...item,
-            children: [...currentChildren, newField],
-          };
-        });
-      }
+    onFieldsChange(prev => {
+      // Logic for adding a new field (always as a child of parentPath)
+      return updateByIndexPath(prev, parentPath, (item) => {
+        const currentChildren = Array.isArray(item.children) ? item.children : [];
+        return {
+          ...item,
+          children: [...currentChildren, newField],
+        };
+      });
     });
-  }, []);
+  }, [onFieldsChange]);
 
-  // Purpose: Handles deleting blocks
+
   const onBlockDelete = useCallback((indexPath) => {
-    setInputArr(prev => {
+    onFieldsChange(prev => {
         if (indexPath.length === 1) {
-            // Deleting a root-level item
             const newArr = [...prev];
             newArr.splice(indexPath[0], 1);
             return newArr;
         }
-        // Deleting a nested item
         return updateByIndexPath(prev, indexPath.slice(0, -1), (parent) => {
             const indexToDelete = indexPath[indexPath.length - 1];
             const newChildren = [...parent.children];
@@ -93,50 +105,43 @@ export default function BlockOrderPage({ showJsonEditorOnly = false }) { // Remo
             return { ...parent, children: newChildren };
         });
     });
-  }, []);
+  }, [onFieldsChange]);
 
-  // Purpose: Handles duplicating blocks
   const onBlockDuplicate = useCallback((indexPath) => {
-    setInputArr(prev => {
+    onFieldsChange(prev => {
         if (indexPath.length === 1) {
-            // Duplicating a root-level item
             const itemToDuplicate = prev[indexPath[0]];
-            const duplicatedItem = { ...itemToDuplicate, id: `${itemToDuplicate.id}-copy-${Date.now()}` }; // Generate unique ID
+            const duplicatedItem = { ...itemToDuplicate, id: `${itemToDuplicate.id}-copy-${Date.now()}` };
             const newArr = [...prev];
             newArr.splice(indexPath[0] + 1, 0, duplicatedItem);
             return newArr;
         }
-        // Duplicating a nested item
         return updateByIndexPath(prev, indexPath.slice(0, -1), (parent) => {
             const indexToDuplicate = indexPath[indexPath.length - 1];
             const itemToDuplicate = parent.children[indexToDuplicate];
-            const duplicatedItem = { ...itemToDuplicate, id: `${itemToDuplicate.id}-copy-${Date.now()}` }; // Generate unique ID
+            const duplicatedItem = { ...itemToDuplicate, id: `${itemToDuplicate.id}-copy-${Date.now()}` };
             const newChildren = [...parent.children];
             newChildren.splice(indexToDuplicate + 1, 0, duplicatedItem);
             return { ...parent, children: newChildren };
         });
     });
-  }, []);
+  }, [onFieldsChange]);
 
 
   return (
     <>
       {showJsonEditorOnly ? (
-        <div className="w-full h-full">
+        <div className="w-full h-full flex flex-col">
           <JsonEditor
             value={json}
             onChange={handleJsonChange}
             onBlur={handleJsonBlur}
           />
-          {error && <div className="text-red-500 mt-2">{error}</div>}
+          {error && <div className="text-red-500 mt-2 text-sm">{error}</div>}
         </div>
       ) : (
         <div className="w-full h-full">
-          {/* InputBuilder for adding root-level fields */}
-          <div style={{marginBottom: '16px'}}> {/* Added margin for spacing */}
-            <InputBuilder onAddField={onAddField} parentPath={[]} />
-          </div>
-
+          {/* REMOVED: "Add New Field" button from here. It's now added from the left panel's "Advanced Field Options" or via pencil icon. */}
           {result.order.map((blockId, i) => {
             const block = result.blocks[blockId];
             return (
@@ -147,12 +152,13 @@ export default function BlockOrderPage({ showJsonEditorOnly = false }) { // Remo
                 childarr={block.childarr}
                 childblocks={block.childblocks}
                 indexPath={[i]}
-                onBlockEdit={onBlockEdit}
+                onBlockEdit={onBlockEdit} // Still passed, but not used by pencil icon directly
                 onMove={onMove}
-                onBlockDelete={onBlockDelete} // Pass delete handler
-                onBlockDuplicate={onBlockDuplicate} // Pass duplicate handler
-                onAddField={onAddField} // Pass add field handler for nested additions
-                parentLength={inputArr.length}
+                onBlockDelete={onBlockDelete}
+                onBlockDuplicate={onBlockDuplicate}
+                onAddField={onAddField} // Still passed for deeper nesting but now from within InputBuilder dialog
+                onOpenInputBuilderForEdit={onOpenInputBuilderForEdit} // This is the key for the pencil icon
+                parentLength={currentFields.length}
               />
             );
           })}
