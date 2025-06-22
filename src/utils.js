@@ -11,6 +11,7 @@ export function convertToOrderBlocks(inputArr) {
   const order = inputArr.map(item => item.id);
   const blocks = {};
   function processBlock(obj) {
+    if (!obj) return {};
     const { children, ...info } = obj;
     let childarr = [];
     let childblocks = {};
@@ -38,6 +39,7 @@ export function convertToOrderBlocks(inputArr) {
  * @returns {Array}
  */
 export function removeItemInNestedArray(arr, path) {
+  if (!Array.isArray(arr)) return [];
   if (path.length === 0) return arr;
   const [head, ...rest] = path;
   if (rest.length === 0) {
@@ -46,7 +48,7 @@ export function removeItemInNestedArray(arr, path) {
   } else {
     // Go deeper
     return arr.map((item, idx) =>
-      idx === head
+    idx === head
         ? { ...item, children: removeItemInNestedArray(item.children || [], rest) }
         : item
     );

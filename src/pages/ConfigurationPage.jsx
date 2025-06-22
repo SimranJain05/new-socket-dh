@@ -12,7 +12,7 @@ export default function ConfigurationPage() {
 
   const result = useMemo(() => convertToOrderBlocks(inputArr), [inputArr]);
 
-  console.log("result: ", result);
+  // console.log("result: ", result);
 
   const handleJsonChange = useCallback(val => setJson(val), []);
   const handleJsonBlur = useCallback(() => {
@@ -26,8 +26,8 @@ export default function ConfigurationPage() {
   }, [json]);
 
   React.useEffect(() => {
-      setJson(JSON.stringify(inputArr, null, 2));
-    }, [inputArr]);
+    setJson(JSON.stringify(inputArr, null, 2));
+  }, [inputArr]);
 
   const onMove = useCallback((indexPath, direction) => {
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));

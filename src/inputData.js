@@ -16,7 +16,8 @@ export const input = [
     "required": true,
     "type": "textField",
     "id": "B",
-    "defaultValue": ""
+    "defaultValue": "",
+    "depends_on": ["A"]
   },
   {
     "id": "C",
