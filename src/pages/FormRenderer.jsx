@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-// Utility function to evaluate visibility
 function isVisible(block, formValues) {
   const cond = block.visibilityCondition;
-  if (!cond) return true; // agar jisme visiblity condition nhi hai key to yehi se true kr do 
-  console.log("dfgdsfg",formValues);
-  console.log("actual cond",cond.field) // -> device type
-  console.log("dfg",formValues[cond.field]); // in general compare through formValues  
-  return formValues[cond.field] === cond.value; // this cond.value is from inputData.js 
+  if (!cond) return true;
+  return formValues[cond.field] === cond.value;
 }
 
 function renderField({
@@ -17,6 +13,7 @@ function renderField({
   childblocks,
   formValues,
   handleChange,
+  dynamicOptions = {}
 }) {
   const {
     type,
@@ -27,23 +24,14 @@ function renderField({
     defaultValue,
     inputType,
     options,
-    id,
+    id
   } = blockData;
 
-  // Evaluate visibility
-  //formValues is the central state object that keeps track of all 
-  // the user inputs (like dropdowns, text fields, etc.) by their id. id se dekh raha hai 
   if (!isVisible(blockData, formValues)) return null;
 
-  console.log("formvalues later",formValues)
-
-  // For dynamic JS function placeholders
   if (typeof childarr === 'string' && childarr.includes('function')) {
     return (
-      <div
-        key={blockId}
-        className="p-3 border border-yellow-400 bg-yellow-100 text-sm rounded mb-4"
-      >
+      <div key={blockId} className="p-3 border border-yellow-400 bg-yellow-100 text-sm rounded mb-4">
         ⚠️ Placeholder for dynamic fields: <code>{childarr}</code>
       </div>
     );
@@ -60,7 +48,7 @@ function renderField({
           placeholder={placeholder}
           required={required}
           value={formValues[id] || ""}
-          onChange={(e) => handleChange(id, e.target.value)}
+          onChange={(e) => handleChange(id, e.target.value, blockData)}
           className="w-full border px-3 py-2 rounded shadow-sm"
         />
         {help && <p className="text-sm text-gray-500 mt-1">{help}</p>}
@@ -70,16 +58,20 @@ function renderField({
 
   if (type === "dropdown") {
     let finalOptions = options || [];
-    let shouldRender = true;
-   console.log("inside",blockData.dependsOn)
-    // Handle dependent dropdowns
-    if (blockData.dependsOn) {
-      const { field, optionsMap } = blockData.dependsOn;
-      const selectedValue = formValues[field];
-      finalOptions = selectedValue && optionsMap[selectedValue] ? optionsMap[selectedValue] : [];
+
+    // Dynamic options (like countries)
+    if (dynamicOptions[id]) {
+      finalOptions = dynamicOptions[id];
     }
 
-    if (!shouldRender) return null;
+    // Dependent dropdown (like stateName)
+    if (blockData.dependsOn) {
+      const { field } = blockData.dependsOn;
+      const selectedParent = formValues[field];
+      if (dynamicOptions[field + "_map"]) {
+        finalOptions = dynamicOptions[field + "_map"][selectedParent] || [];
+      }
+    }
 
     return (
       <div key={blockId} className="mb-4">
@@ -87,20 +79,20 @@ function renderField({
           {title} {required && <span className="text-red-500">*</span>}
         </label>
         <select
-  required={required}
-  value={formValues[id] || ""}
-  onChange={(e) => handleChange(id, e.target.value, blockData)}
-  className="w-full border px-3 py-2 rounded shadow-sm"
->
-  <option value="" disabled>
-    {finalOptions.length === 0 ? "No options available" : "Select an option"}
-  </option>
-  {finalOptions.map((opt, idx) => (
-    <option key={idx} value={opt.value}>
-      {opt.label}
-    </option>
-  ))}
-</select>
+          required={required}
+          value={formValues[id] || ""}
+          onChange={(e) => handleChange(id, e.target.value, blockData)}
+          className="w-full border px-3 py-2 rounded shadow-sm"
+        >
+          <option value="" disabled>
+            {finalOptions.length === 0 ? "Loading..." : "Select an option"}
+          </option>
+          {finalOptions.map((opt, idx) => (
+            <option key={idx} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         {help && <p className="text-sm text-gray-500 mt-1">{help}</p>}
       </div>
     );
@@ -108,10 +100,7 @@ function renderField({
 
   if (type === "input_group") {
     return (
-      <fieldset
-        key={blockId}
-        className="mb-6 border border-gray-300 p-4 rounded-lg"
-      >
+      <fieldset key={blockId} className="mb-6 border border-gray-300 p-4 rounded-lg">
         <legend className="text-base font-semibold">{title}</legend>
         {help && <p className="text-sm text-gray-500 mb-2">{help}</p>}
         {childarr.map((childId) =>
@@ -122,6 +111,7 @@ function renderField({
             childblocks: childblocks[childId].childblocks,
             formValues,
             handleChange,
+            dynamicOptions
           })
         )}
       </fieldset>
@@ -133,21 +123,25 @@ function renderField({
 
 export default function FormRenderer({ blocks, order }) {
   const [formValues, setFormValues] = useState({});
+  const [dynamicOptions, setDynamicOptions] = useState({
+    countryName: [],
+    countryName_map: {}
+  });
 
   const handleChange = useCallback((id, value, blockData = {}) => {
-    setFormValues((prev) => {     // here stores the values
+    setFormValues((prev) => {
       const updated = { ...prev, [id]: value };
 
       // Reset dependent dropdown when parent changes
       if (id === "countryName") {
-        updated["stateName"] = ""; // clears the selection here
+        updated["stateName"] = "";
       }
 
       return updated;
     });
   }, []);
-   // formValues is calculated inside this FormRender which runs for every field
-  useEffect(() => {   // populating default Values inside Form Builder
+
+  useEffect(() => {
     const defaults = {};
     for (const blockId of order) {
       const block = blocks[blockId];
@@ -159,6 +153,68 @@ export default function FormRenderer({ blocks, order }) {
     setFormValues((prev) => ({ ...defaults, ...prev }));
   }, [blocks, order]);
 
+  // Fetch countries
+  // useEffect(() => {
+  //   async function fetchCountries() {
+  //     try {
+  //       const res = await fetch("https://dev.sokt.io/func/scriyEy5umbX");
+  //       const data = await res.json();
+  //       console.log("Country Data",data);
+  //       setDynamicOptions(prev => ({ ...prev, countryName: data }));
+  //     } catch (err) {
+  //       console.error("Error fetching countries:", err);
+  //     }
+  //   }
+  //   fetchCountries();
+  // }, []);
+
+  // // Fetch states
+  // useEffect(() => {
+  //   async function fetchStates() {
+  //     try {
+  //       const res = await fetch("https://dev.sokt.io/func/scrijohNaP2O");
+  //       const data2 = await res.json();
+  //       console.log("state Data",data2)
+  //       setDynamicOptions(prev => ({ ...prev, countryName_map: data2 }));
+  //     } catch (err) {
+  //       console.error("Error fetching states:", err);
+  //     }
+  //   }
+  //   fetchStates();
+  // }, []);
+
+
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [countryRes, stateRes] = await Promise.all([
+          fetch("https://dev.sokt.io/func/scriyEy5umbX"),
+          fetch("https://dev.sokt.io/func/scrijohNaP2O")
+        ]);
+  
+        const countryData = await countryRes.json();
+        const stateData = await stateRes.json();
+  
+        console.log("Country Data", countryData);
+        console.log("State Data", stateData);
+  
+        setDynamicOptions(prev => ({
+          ...prev,
+          countryName: countryData,
+          countryName_map: stateData
+        }));
+      } catch (err) {
+        console.error("Error fetching dynamic data:", err);
+      }
+    }
+  
+    fetchData();
+  }, []);
+
+  
+
+  
   return (
     <form className="w-full p-4">
       {order.map((blockId) => {
@@ -170,6 +226,7 @@ export default function FormRenderer({ blocks, order }) {
           childblocks: block.childblocks,
           formValues,
           handleChange,
+          dynamicOptions
         });
       })}
     </form>

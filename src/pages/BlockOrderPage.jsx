@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { input } from '../inputData.js';
 import { convertToOrderBlocks, moveItemInNestedArray, updateByIndexPath } from '../utils.js';
 import { MemoizedBlockTree } from '../BlockTree.jsx';
@@ -45,7 +45,9 @@ export default function BlockOrderPage() {
     );
   }, []);
 
+useEffect(()=>{
 
+},[])
   // Purpose: Handles reordering blocks (moving them up/down in the hierarchy)
   // Stable callback for moving blocks - now uses ref to avoid recreating on every render
   const onMove = useCallback((indexPath, direction) => {

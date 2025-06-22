@@ -14,12 +14,8 @@ export const input = [
     "id": "countryName",
     "type": "dropdown",
     "title": "Country",
-    "options": [
-      { "label": "India", "value": "India" },
-      { "label": "USA", "value": "USA" }
-    ],
-    "defaultValue": "",
-    "children": []
+     "required":"true",
+     "dynamic":true
   },
   {
     "id": "stateName",
@@ -28,16 +24,24 @@ export const input = [
     "options": [], // Will be set dynamically
     "dependsOn": {
       "field": "countryName",
-      "optionsMap": {
-        "India": [
-          { "label": "MP", "value": "MP" },
-          { "label": "UP", "value": "UP" }
-        ],
-        "USA": [
-          { "label": "California", "value": "California" },
-          { "label": "Texas", "value": "Texas" }
-        ]
-      }
+  //     "optionsMap": {
+  //       "India": [
+  //         { "label": "MP", "value": "MP" },
+  //         { "label": "UP", "value": "UP" }
+  //       ],
+  //       "USA": [
+  //         { "label": "California", "value": "California" },
+  //         { "label": "Texas", "value": "Texas" }
+  //       ],
+  //       "Russia": [
+  //   { label: "Moscow", value: "Moscow" },
+  //   { label: "Saint Petersburg", value: "Saint Petersburg" }
+  // ],
+  // "UK": [
+  //   { label: "London", value: "London" },
+  //   { label: "Manchester", value: "Manchester" }
+  // ]
+  //     }
     },
     "children": []
   },
@@ -154,29 +158,3 @@ export const input = [
 
 
 
-// export const input = [
-//   // {
-//   //   "id": "deviceType",
-//   //   "type": "dropdown",
-//   //   "title": "Select Device Type",
-//   //   "options": [
-//   //     { "label": "Laptop", "value": "laptop" },
-//   //     { "label": "Mobile", "value": "mobile" },
-//   //     { "label": "Others", "value": "others" }
-//   //   ],
-//   //   "defaultValue": "mobile",
-//   //   "children": []
-//   // },
-//   // {
-//   //   "id": "modelName",
-//   //   "type": "input",
-//   //   "title": "Laptop Model",
-//   //   "placeholder": "Enter model name",
-//   //   "required": false,
-//   //   "visibilityCondition": {
-//   //     "field": "deviceType",
-//   //     "value": "laptop"
-//   //   },
-//   //   "children": []
-//   // }
-// ];
