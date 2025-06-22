@@ -1,23 +1,63 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, Box, TextField, Checkbox, FormControlLabel, Select, MenuItem, IconButton, Tooltip, Typography } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import isEqual from 'lodash.isequal';
+import { useDispatch, useSelector } from 'react-redux';
 
 function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPath, onMove, onDelete }) {
+  const dispatch = useDispatch();
+  const response = useSelector(state => state.userResponse);
   const { info, childarr, childblocks } = block;
+  const depends = info.depends_on || [];
+  const isDisabled = depends.length > 0 && depends.some(depId => !response[depId] && response[depId] !== 0 && response[depId] !== false);
+  // Robust helper to convert indexPath to id-path for Redux value get/set
+  function indexPathToIdPath(indexPath, order, blocks) {
+    let idPath = [];
+    let currentOrder = order;
+    let currentBlocks = blocks;
+    for (let i = 0; i < indexPath.length; i++) {
+      const idx = indexPath[i];
+      const key = currentOrder[idx];
+      idPath.push(key);
+      if (currentBlocks && currentBlocks[key] && currentBlocks[key].info && Array.isArray(currentBlocks[key].info.children)) {
+        currentOrder = currentBlocks[key].info.children.map(child => child.id);
+        currentBlocks = Object.fromEntries(currentBlocks[key].info.children.map(child => [child.id, { info: child }]));
+      } else {
+        break;
+      }
+    }
+    return idPath;
+  }
+  // Use top-level order/blocks for id-path conversion
+  const rootOrder = useSelector(state => state.input.order);
+  const rootBlocks = useSelector(state => state.input.blocks);
+  const pathArr = [...indexPathToIdPath(indexPath, rootOrder, rootBlocks), info.id];
+  const [localValue, setLocalValue] = useState(info.allowMultiSelect ? [] : '');
+
+  useEffect(() => {
+    setLocalValue(info.allowMultiSelect ? [] : '');
+    // eslint-disable-next-line
+  }, []);
+  function handleBlur() {
+    dispatch({ type: 'userResponse/updateUserResponse', payload: { pathArr, value: localValue } });
+  }
   let field = null;
   switch (info.type) {
   case 'textField':
     field = (
       <TextField
         size="small"
-        label={info.title || info.label || info.id}
+        label={info.title || info.label}
         placeholder={info.placeholder}
         required={info.required}
         type={info.inputType || 'text'}
-        defaultValue={info.defaultValue}
+        // defaultValue={info.defaultValue}
+        value={localValue}
+        onChange={e => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        disabled={isDisabled}
         sx={{ mb: 1, minWidth: 200 }}
       />
     );
@@ -25,8 +65,13 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
   case 'checkbox':
     field = (
       <FormControlLabel
-        control={<Checkbox defaultChecked={!!info.defaultValue} />}
-        label={info.title || info.label || info.id}
+        control={<Checkbox
+          checked={!!localValue}
+          onChange={e => setLocalValue(e.target.checked)}
+          onBlur={handleBlur}
+          disabled={isDisabled}
+        />}
+        label={info.title || info.label}
         sx={{ mb: 1 }}
       />
     );
@@ -39,11 +84,15 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
         size="small"
         displayEmpty
         multiple={!!info.allowMultiSelect}
+        value={localValue}
+        onChange={e => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        disabled={isDisabled}
         defaultValue={info.allowMultiSelect ? [] : ''}
         sx={{ mb: 1, minWidth: 200 }}
         renderValue={selected => {
           if (!selected || (Array.isArray(selected) && selected.length === 0)) {
-            return <span className="text-gray-400">{info.title || info.label || info.id}</span>;
+            return <span className="text-gray-400">{info.title || info.label}</span>;
           }
           if (Array.isArray(selected)) {
             return selected.map(val => options.find(opt => opt.value === val)?.label || val).join(', ');
@@ -51,7 +100,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
           return options.find(opt => opt.value === selected)?.label || selected;
         }}
       >
-        <MenuItem value="" disabled>{info.title || info.label || info.id}</MenuItem>
+        <MenuItem value="" disabled>{info.title || info.label}</MenuItem>
         {options.map(opt => (
           <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
         ))}
@@ -63,8 +112,15 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     const options = info.options || [];
     field = (
       <Box sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" className="mb-1">{info.title || info.label || info.id}</Typography>
-        <RadioGroup row defaultValue={info.defaultValue}>
+        <Typography variant="subtitle2" className="mb-1">{info.title || info.label}</Typography>
+        <RadioGroup
+          row
+          value={localValue}
+          onChange={e => setLocalValue(e.target.value)}
+          onBlur={handleBlur}
+          disabled={isDisabled}
+          // defaultValue={info.defaultValue}
+        >
           {options.map(opt => (
             <FormControlLabel key={opt.value} value={opt.value} control={<Radio />} label={opt.label} />
           ))}
@@ -76,7 +132,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
   case 'inputGroup': {
     field = (
       <Box sx={{ mb: 2, pl: 2, borderLeft: '2px solid #e0e0e0' }}>
-        <Typography variant="subtitle2" className="mb-1">{info.title || info.label || info.id}</Typography>
+        <Typography variant="subtitle2" className="mb-1">{info.title || info.label}</Typography>
         {Array.isArray(info.children) && (
           <MemoizedInputBuilderForm
             order={info.children.map(child => child.id)}
@@ -94,10 +150,10 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
   case 'attachment': {
     field = (
       <Box sx={{ mb: 1 }}>
-        <Typography variant="subtitle2">{info.title || info.label || info.id}</Typography>
-        <Button variant="outlined" component="label" size="small" sx={{ mt: 1 }}>
+        <Typography variant="subtitle2">{info.title || info.label}</Typography>
+        <Button variant="outlined" component="label" size="small" sx={{ mt: 1 }} disabled={isDisabled}>
           Upload File
-          <input type="file" hidden accept={(info.accept || []).join(',')} />
+          <input type="file" hidden accept={(info.accept || []).join(',')} onChange={e => setLocalValue(e.target.files?.[0] || null)} onBlur={handleBlur} />
         </Button>
         {info.maxFileSizeMB && (
           <Typography variant="caption" color="text.secondary">Max size: {info.maxFileSizeMB} MB</Typography>
@@ -110,13 +166,17 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     field = (
       <TextField
         size="small"
-        label={info.title || info.label || info.id}
+        label={info.title || info.label}
         placeholder={info.placeholder}
         required={info.required}
         multiline
         minRows={info.rows || 3}
         inputProps={{ maxLength: info.maxLength || undefined }}
-        defaultValue={info.defaultValue}
+        // defaultValue={info.defaultValue}
+        value={localValue}
+        onChange={e => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        disabled={isDisabled}
         sx={{ mb: 1, minWidth: 200 }}
       />
     );
@@ -126,9 +186,12 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     // Requires @mui/x-date-pickers
     field = (
       <Box sx={{ mb: 1 }}>
-        <Typography variant="subtitle2">{info.title || info.label || info.id}</Typography>
+        <Typography variant="subtitle2">{info.title || info.label}</Typography>
         <DatePicker
-          slotProps={{ textField: { size: 'small', required: info.required, sx: { minWidth: 200 } } }}
+          value={localValue}
+          onChange={val => setLocalValue(val)}
+          onBlur={handleBlur}
+          slotProps={{ textField: { size: 'small', required: info.required, sx: { minWidth: 200 }, disabled: isDisabled } }}
           minDate={info.minDate || undefined}
           maxDate={info.maxDate || undefined}
         />
@@ -140,8 +203,12 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     field = (
       <TextField
         size="small"
-        label={info.title || info.label || info.id}
+        label={info.title || info.label}
         placeholder={info.placeholder}
+        value={localValue}
+        onChange={e => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        disabled={isDisabled}
         sx={{ mb: 1, minWidth: 200 }}
       />
     );
@@ -183,25 +250,25 @@ function InputBuilderForm({ order, blocks, level = 0, indexPath = [], onMove, on
   const memoizedBlocks = useMemo(() => blocks, [blocks]);
   if (!memoizedOrder || !memoizedBlocks) return null;
   return (
-    <Box sx={{ pl: Math.min(level * 4, 32) }}>
-      {memoizedOrder.map((blockId, idx) => {
-        const block = memoizedBlocks[blockId];
-        if (!block) return null;
-        return (
-          <MemoizedInputBuilderBlock
-            key={blockId}
-            blockId={blockId}
-            block={block}
-            index={idx}
-            orderLength={memoizedOrder.length}
-            level={level}
-            indexPath={indexPath}
-            onMove={onMove}
-            onDelete={onDelete}
-          />
-        );
-      })}
-    </Box>
+        <Box sx={{ pl: Math.min(level * 4, 32) }}>
+          {memoizedOrder.map((blockId, idx) => {
+            const block = memoizedBlocks[blockId];
+            if (!block) return null;
+            return (
+              <MemoizedInputBuilderBlock
+                key={blockId}
+                blockId={blockId}
+                block={block}
+                index={idx}
+                orderLength={memoizedOrder.length}
+                level={level}
+                indexPath={indexPath}
+                onMove={onMove}
+                onDelete={onDelete}
+              />
+            );
+          })}
+        </Box>
   );
 }
 
