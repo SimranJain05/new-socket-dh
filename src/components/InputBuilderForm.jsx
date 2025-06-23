@@ -19,7 +19,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     let currentBlocks = blocks;
     for (let i = 0; i < indexPath.length; i++) {
       const idx = indexPath[i];
-      const key = currentOrder[idx];
+      const key = currentOrder?.[idx];
       idPath.push(key);
       if (currentBlocks && currentBlocks[key] && currentBlocks[key].info && Array.isArray(currentBlocks[key].info.children)) {
         currentOrder = currentBlocks[key].info.children.map(child => child.id);
