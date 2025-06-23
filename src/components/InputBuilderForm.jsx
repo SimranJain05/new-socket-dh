@@ -12,36 +12,21 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
   const { info, childarr, childblocks } = block;
   const depends = info.depends_on || [];
   const isDisabled = depends.length > 0 && depends.some(depId => !response[depId] && response[depId] !== 0 && response[depId] !== false);
-  // Robust helper to convert indexPath to id-path for Redux value get/set
-  function indexPathToIdPath(indexPath, order, blocks) {
-    let idPath = [];
-    let currentOrder = order;
-    let currentBlocks = blocks;
-    for (let i = 0; i < indexPath.length; i++) {
-      const idx = indexPath[i];
-      const key = currentOrder?.[idx];
-      idPath.push(key);
-      if (currentBlocks && currentBlocks[key] && currentBlocks[key].info && Array.isArray(currentBlocks[key].info.children)) {
-        currentOrder = currentBlocks[key].info.children.map(child => child.id);
-        currentBlocks = Object.fromEntries(currentBlocks[key].info.children.map(child => [child.id, { info: child }]));
-      } else {
-        break;
-      }
-    }
-    return idPath;
-  }
-  // Use top-level order/blocks for id-path conversion
-  const rootOrder = useSelector(state => state.input.order);
-  const rootBlocks = useSelector(state => state.input.blocks);
-  const pathArr = [...indexPathToIdPath(indexPath, rootOrder, rootBlocks), info.id];
+  // No need for rootOrder/rootBlocks/pathArr. Use info.id directly as key.
   const [localValue, setLocalValue] = useState(info.allowMultiSelect ? [] : '');
+  const value = response[info.id];
 
   useEffect(() => {
-    setLocalValue(info.allowMultiSelect ? [] : '');
+    // Sync localValue from Redux value if present, else default
+    if (typeof value !== 'undefined') {
+      setLocalValue(value);
+    } else {
+      setLocalValue(info.allowMultiSelect ? [] : '');
+    }
     // eslint-disable-next-line
-  }, []);
+  }, [value, info.allowMultiSelect]);
   function handleBlur() {
-    dispatch({ type: 'userResponse/updateUserResponse', payload: { pathArr, value: localValue } });
+    dispatch({ type: 'userResponse/updateUserResponse', payload: { id: info.id, value: localValue } });
   }
   let field = null;
   switch (info.type) {
