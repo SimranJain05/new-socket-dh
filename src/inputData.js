@@ -20,6 +20,31 @@ export const input = [
     "depends_on": ["A"]
   },
   {
+    "id": "deviceType",
+    "type": "dropdown",
+    "title": "Select Device Type",
+    "placeholder":"enter device type",
+    "options": [
+      { "label": "Laptop", "value": "laptop" },
+      { "label": "Mobile", "value": "mobile" },
+      { "label": "Others", "value": "others" }
+    ],
+    "defaultValue": "mobile",
+    "children": []
+  },
+  {
+    "id": "modelName",
+    "type": "textField",
+    "title": "Laptop Model",
+    "placeholder": "Enter model name",
+    "required": false,
+    "visibilityCondition": {
+      "field": "deviceType", // stores Id of deviceType dropdown using inside visibility logic
+      "value": "laptop"
+    },
+    "children": []
+  },
+  {
     "id": "C",
     "type": "inputGroup",
     "title": "Contact Information",
