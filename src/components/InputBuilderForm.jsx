@@ -6,15 +6,19 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import isEqual from 'lodash.isequal';
 import { useDispatch, useSelector } from 'react-redux';
 
-function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPath, onMove, onDelete }) {
+function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPath, idPath, onMove, onDelete }) {
   const dispatch = useDispatch();
   const response = useSelector(state => state.userResponse);
   const { info, childarr, childblocks } = block;
   const depends = info.depends_on || [];
   const isDisabled = depends.length > 0 && depends.some(depId => !response[depId] && response[depId] !== 0 && response[depId] !== false);
-  // No need for rootOrder/rootBlocks/pathArr. Use info.id directly as key.
+  const myIdPath = idPath ? [...idPath, info.id] : [info.id];
+  // Helper to get nested value by idPath
+  function getNested(obj, path) {
+    return path.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
+  }
   const [localValue, setLocalValue] = useState(info.allowMultiSelect ? [] : '');
-  const value = response[info.id];
+  const value = getNested(response, myIdPath);
 
   useEffect(() => {
     // Sync localValue from Redux value if present, else default
@@ -26,7 +30,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     // eslint-disable-next-line
   }, [value, info.allowMultiSelect]);
   function handleBlur() {
-    dispatch({ type: 'userResponse/updateUserResponse', payload: { id: info.id, value: localValue } });
+    dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: localValue } });
   }
   let field = null;
   switch (info.type) {
@@ -119,14 +123,15 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
       <Box sx={{ mb: 2, pl: 2, borderLeft: '2px solid #e0e0e0' }}>
         <Typography variant="subtitle2" className="mb-1">{info.title || info.label}</Typography>
         {Array.isArray(info.children) && (
-          <MemoizedInputBuilderForm
-            order={info.children.map(child => child.id)}
-            blocks={Object.fromEntries(info.children.map(child => [child.id, { info: child }]))}
-            level={level + 1}
-            indexPath={[...indexPath, index]}
-            onMove={onMove}
-            onDelete={onDelete}
-          />
+            <MemoizedInputBuilderForm
+              order={info.children.map(child => child.id)}
+              blocks={Object.fromEntries(info.children.map(child => [child.id, { info: child }]))}
+              level={level + 1}
+              indexPath={[...(indexPath||[]), index]}
+              idPath={[...(idPath||[]), info.id]}
+              onMove={onMove}
+              onDelete={onDelete}
+            />
         )}
       </Box>
     );
@@ -210,7 +215,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
         <Box>
           {field}
           {Array.isArray(childarr) && childarr.length > 0 && (
-            <MemoizedInputBuilderForm order={childarr} blocks={childblocks} level={level + 1} indexPath={[...indexPath, index]} onMove={onMove} onDelete={onDelete} />
+            <MemoizedInputBuilderForm order={childarr} blocks={childblocks} level={level + 1} indexPath={[...(indexPath||[]), index]} idPath={myIdPath} onMove={onMove} onDelete={onDelete} />
           )}
         </Box>
         <Tooltip title="Delete"><span><IconButton size="small" color="error" onClick={() => onDelete([...indexPath, index])}><DeleteIcon fontSize="small" /></IconButton></span></Tooltip>
@@ -230,7 +235,7 @@ const MemoizedInputBuilderBlock = React.memo(InputBuilderBlock, (prev, next) => 
   );
 }); // already uses isEqual for block and indexPath, correct as is.
 
-function InputBuilderForm({ order, blocks, level = 0, indexPath = [], onMove, onDelete }) {
+function InputBuilderForm({ order, blocks, level = 0, indexPath = [], idPath = [], onMove, onDelete }) {
   const memoizedOrder = useMemo(() => order, [order]);
   const memoizedBlocks = useMemo(() => blocks, [blocks]);
   if (!memoizedOrder || !memoizedBlocks) return null;
@@ -248,6 +253,7 @@ function InputBuilderForm({ order, blocks, level = 0, indexPath = [], onMove, on
                 orderLength={memoizedOrder.length}
                 level={level}
                 indexPath={indexPath}
+                idPath={idPath}
                 onMove={onMove}
                 onDelete={onDelete}
               />
