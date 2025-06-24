@@ -11,7 +11,12 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
   const response = useSelector(state => state.userResponse);
   const { info, childarr, childblocks } = block;
   const depends = info.depends_on || [];
-  const isDisabled = depends.length > 0 && depends.some(depId => !response[depId] && response[depId] !== 0 && response[depId] !== false);
+  // For full path dependency, use getNested to check each
+  const isDisabled = depends.length > 0 && depends.some(depPath => {
+    const arrPath = Array.isArray(depPath) ? depPath : [depPath];
+    const val = getNested(response, arrPath);
+    return !val && val !== 0 && val !== false;
+  });
   const myIdPath = idPath ? [...idPath, info.id] : [info.id];
   // Helper to get nested value by idPath
   function getNested(obj, path) {
@@ -82,6 +87,37 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
 
     // Track last options to clear value if needed
     const prevOptionsRef = React.useRef([]);
+    // Infer dependencies from dynamicOptions code
+    function inferDependenciesFromFn(fnStr) {
+      // Extracts all userResponse.<key>[.<key2>...] and returns array of unique paths
+      const regex = /userResponse((?:\.[a-zA-Z0-9_]+)+)/g;
+      const deps = [];
+      let match;
+      while ((match = regex.exec(fnStr))) {
+        const path = match[1].split('.').filter(Boolean); // Remove empty strings
+        if (path.length > 0) {
+          deps.push(path);
+        }
+      }
+      // Deduplicate using Set+JSON.stringify
+      const seen = new Set();
+      const unique = [];
+      for (const arr of deps) {
+        const key = JSON.stringify(arr);
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(arr);
+        }
+      }
+      return unique;
+    }
+    // Attach inferred dependencies as info.depends_on (runtime only)
+    let inferredDeps = [];
+    if (info.dynamicOptions) {
+      inferredDeps = inferDependenciesFromFn(info.dynamicOptions);
+      info.depends_on = inferredDeps;
+    }
+
     useEffect(() => {
       let active = true;
       if (info.dynamicOptions) {
@@ -122,10 +158,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
       return () => { active = false; };
       // Re-run when any dependency field value changes
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, info.dynamicOptions ? (info.optionDependencies || []).map(dep => {
-      const depPath = Array.isArray(dep) ? dep : [dep];
-      return getNested(response, depPath);
-    }) : []);
+    }, info.dynamicOptions ? inferredDeps.map(depPath => getNested(response, depPath)) : []);
 
     if (info.dynamicOptions) {
       options = dynamicOptions;
