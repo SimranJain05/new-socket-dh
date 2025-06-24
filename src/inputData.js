@@ -1,4 +1,4 @@
-// Sample input with a corrected, safer dynamic group
+// Sample input with the key renamed to 'dynamicOptions'.
 export const input = [
   {
     "placeholder": "Enter your name",
@@ -60,9 +60,8 @@ export const input = [
         "type": "dynamicGroup",
         "title": "Dynamic Additional Info",
         "depends_on": ["dynamic_control"],
-        "source": `
+        "dynamicOptions": `
           function(response) {
-            // FIX: Use optional chaining (?.) to safely access the nested property.
             const selection = response?.C?.dynamic_control;
 
             if (selection === 'social') {
@@ -104,7 +103,7 @@ export const input = [
                 }
               ];
             }
-            return []; // Return empty array if selection is undefined or doesn't match
+            return [];
           }
         `
       }
