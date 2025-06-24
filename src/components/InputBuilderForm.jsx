@@ -84,9 +84,6 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
       // eslint-disable-next-line no-new-func
       return Function('userResponse', `return (${fnStr})(userResponse);`);
     }
-
-    // Track last options to clear value if needed
-    const prevOptionsRef = React.useRef([]);
     // Infer dependencies from dynamicOptions code
     function inferDependenciesFromFn(fnStr) {
       // Extracts all userResponse.<key>[.<key2>...] and returns array of unique paths
@@ -99,7 +96,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
           deps.push(path);
         }
       }
-      // Deduplicate using Set+JSON.stringify
+      
       const seen = new Set();
       const unique = [];
       for (const arr of deps) {
