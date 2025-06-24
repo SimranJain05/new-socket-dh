@@ -1,6 +1,23 @@
 // Sample input copied from your testConvertBlocks.js
 export const input = [
   {
+    "id": "dummyDependency",
+    "type": "textField",
+    "title": "Dummy Dependency",
+    "help": "Type 'foo' or 'bar' to see different options",
+    "required": false,
+    "defaultValue": ""
+  },
+  {
+    "id": "dummyDynamic",
+    "type": "dropdown",
+    "title": "Dummy Dynamic Dropdown",
+    "help": "Options depend on Dummy Dependency field",
+    "dynamicOptions": "async function(userResponse) { await new Promise(res => setTimeout(res, 500)); console.log('api called'); if (userResponse.dummyDependency === 'foo') return [{ label: 'Foo Option 1', value: 'foo1' }, { label: 'Foo Option 2', value: 'foo2' }]; if (userResponse.dummyDependency === 'bar') return [{ label: 'Bar Option 1', value: 'bar1' }, { label: 'Bar Option 2', value: 'bar2' }]; return []; }",
+    "defaultValue": "",
+    "allowMultiSelect": false
+  },
+  {
     "placeholder": "Enter your name",
     "title": "Full Name",
     "help": "Please provide your full legal name",
