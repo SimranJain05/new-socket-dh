@@ -1,96 +1,111 @@
-// Sample input copied from your testConvertBlocks.js
+// Sample input with the key renamed to 'dynamicOptions'.
 export const input = [
   {
     "placeholder": "Enter your name",
     "title": "Full Name",
-    "help": "Please provide your full legal name",
     "required": true,
     "type": "textField",
-    "id": "A",
-    "defaultValue": ""
+    "id": "A"
   },
   {
     "placeholder": "Enter your email",
     "title": "Email Address",
-    "help": "We’ll send updates to this email",
     "required": true,
     "type": "textField",
     "id": "B",
-    "defaultValue": "",
     "depends_on": ["A"]
   },
   {
     "id": "C",
     "type": "inputGroup",
     "title": "Contact Information",
-    "help": "Group for various contact methods",
     "children": [
       {
         "id": "C1",
         "type": "inputGroup",
         "title": "Phone Number",
-        "help": "Enter country code and number",
         "children": [
           {
             "id": "C11",
             "type": "dropdown",
             "title": "Country Code",
-            "help": "Select your country code",
             "required": true,
             "options": [
               { "label": "+1 (USA)", "value": "+1" },
               { "label": "+91 (India)", "value": "+91" }
             ],
-            "defaultValue": "+91",
-            "allowMultiSelect": false
+            "defaultValue": "+91"
           },
           {
             "id": "C12",
             "type": "textField",
             "title": "Phone number",
-            "help": "Enter your phone number",
             "placeholder": "Phone number",
-            "required": true,
-            "defaultValue": ""
+            "required": true
           }
         ]
+      },
+      {
+        "id": "dynamic_control",
+        "type": "dropdown",
+        "title": "What information do you want to provide?",
+        "options": [
+          { "label": "Social Media", "value": "social" },
+          { "label": "Company Details", "value": "company" }
+        ],
+        "defaultValue": "social"
       },
       {
         "id": "C2",
-        "type": "inputGroup",
-        "title": "Dynamic Fields",
-        "help": "Fields generated dynamically",
-        "children": []
-      },
-      {
-        "id": "C3",
-        "type": "inputGroup",
-        "title": "Nested Group C3",
-        "help": "Contains deeper nested fields",
-        "children": [
-          {
-            "id": "C31",
-            "type": "textField",
-            "title": "C31 Field",
-            "placeholder": "Static field C31",
-            "help": "Some help text for C31",
-            "required": true,
-            "defaultValue": ""
-          },
-          {
-            "id": "C32",
-            "type": "inputGroup",
-            "title": "Dynamic Subgroup C32",
-            "children": []
-          },
-          {
-            "id": "C33",
-            "type": "inputGroup",
-            "title": "Subgroup C33",
-            "help": "Another level of static fields",
-            "children": []
+        "type": "dynamicGroup",
+        "title": "Dynamic Additional Info",
+        "depends_on": ["dynamic_control"],
+        "dynamicOptions": `
+          function(response) {
+            const selection = response?.C?.dynamic_control;
+
+            if (selection === 'social') {
+              return [
+                {
+                  "id": "twitter_handle",
+                  "type": "textField",
+                  "title": "Twitter Handle",
+                  "placeholder": "@username"
+                },
+                {
+                  "id": "linkedin_url",
+                  "type": "textField",
+                  "title": "LinkedIn Profile URL",
+                  "placeholder": "https://linkedin.com/in/..."
+                }
+              ];
+            } else if (selection === 'company') {
+              return [
+                {
+                  "id": "company_name",
+                  "type": "textField",
+                  "title": "Company Name"
+                },
+                {
+                  "id": "company_size",
+                  "type": "dropdown",
+                  "title": "Company Size",
+                  "options": [
+                    {"label": "1-10 employees", "value": "small"},
+                    {"label": "11-50 employees", "value": "medium"},
+                    {"label": "51+ employees", "value": "large"}
+                  ]
+                },
+                {
+                    "id": "is_remote",
+                    "type": "checkbox",
+                    "title": "Is the company fully remote?"
+                }
+              ];
+            }
+            return [];
           }
-        ]
+        `
       }
     ]
   }

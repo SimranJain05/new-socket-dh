@@ -1,20 +1,36 @@
-// Centralized utility functions for new-socket-dh
-// Consolidate all reusable logic here
-
-// --- Block Utilities ---
 /**
- * Converts an input array of blocks to an order + blocks structure.
- * @param {Array} inputArr
+ * Converts an input array of blocks to an order + blocks structure,
+ * processing dynamic groups based on the current form response.
+ * @param {Array} inputArr The array of field definitions.
+ * @param {Object} response The current state of the form's user responses.
  * @returns {{order: Array, blocks: Object}}
  */
-export function convertToOrderBlocks(inputArr) {
+export function convertToOrderBlocks(inputArr, response = {}) {
   const order = inputArr.map(item => item.id);
   const blocks = {};
-  function processBlock(obj) {
-    if (!obj) return {};
+
+  function processBlock(originalObj) {
+    if (!originalObj) return {};
+
+    const obj = { ...originalObj };
+
+    // Check for 'dynamicOptions' key instead of 'source'
+    if (obj.type === 'dynamicGroup' && obj.dynamicOptions) {
+      try {
+        // Use 'dynamicOptions' key to create the function
+        const dynamicFunc = new Function('return (' + obj.dynamicOptions + ')')();
+        const dynamicChildren = dynamicFunc(response) || [];
+        obj.children = dynamicChildren;
+      } catch (e) {
+        console.error(`Error executing dynamic source for ID "${obj.id}":`, e);
+        obj.children = [];
+      }
+    }
+
     const { children, ...info } = obj;
     let childarr = [];
     let childblocks = {};
+
     if (Array.isArray(children)) {
       childarr = children.map(child => child.id);
       for (const child of children) {
@@ -23,15 +39,17 @@ export function convertToOrderBlocks(inputArr) {
     } else if (typeof children === 'string') {
       info.dynamicChildren = children;
     }
+
     return { info, childarr, childblocks };
   }
+
   for (const item of inputArr) {
     blocks[item.id] = processBlock(item);
   }
+
   return { order, blocks };
 }
 
-// --- Move/Delete Utilities ---
 /**
  * Removes an item at a given index path from a nested array structure.
  * @param {Array} arr
@@ -43,10 +61,8 @@ export function removeItemInNestedArray(arr, path) {
   if (path.length === 0) return arr;
   const [head, ...rest] = path;
   if (rest.length === 0) {
-    // Remove at this level
     return arr.filter((_, idx) => idx !== head);
   } else {
-    // Go deeper
     return arr.map((item, idx) =>
     idx === head
         ? { ...item, children: removeItemInNestedArray(item.children || [], rest) }
@@ -66,7 +82,6 @@ export function moveItemInNestedArray(arr, path, direction) {
   if (path.length === 0) return arr;
   const [head, ...rest] = path;
   if (rest.length === 0) {
-    // At the parent level
     const idx = head;
     const newArr = [...arr];
     if (
@@ -79,7 +94,6 @@ export function moveItemInNestedArray(arr, path, direction) {
     [newArr[idx], newArr[swapWith]] = [newArr[swapWith], newArr[idx]];
     return newArr;
   } else {
-    // Go deeper
     return arr.map((item, idx) =>
       idx === head
         ? {
@@ -98,11 +112,6 @@ export function moveItemInNestedArray(arr, path, direction) {
  * @param {Function} updater - Function to update the target item/array
  * @returns {Array}
  */
-
-//Purpose: Recursively updates nested array based on index path
-// Helper to update nested array by index path (memoized outside component)
-//path for example [2,0,1]
-
 export const updateByIndexPath = (arr, path, updater) => {
   if (path.length === 0) return updater(arr);
   const [head, ...rest] = path;

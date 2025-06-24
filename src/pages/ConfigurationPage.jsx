@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import JsonInputField from '../components/JsonInputField.jsx';
 import { MemoizedInputBuilderForm } from '../components/InputBuilderForm.jsx';
 import { convertToOrderBlocks, moveItemInNestedArray, removeItemInNestedArray } from '../utils.js';
@@ -10,9 +11,9 @@ export default function ConfigurationPage() {
   const [inputArr, setInputArr] = useState(input);
   const [error, setError] = useState(null);
 
-  const result = useMemo(() => convertToOrderBlocks(inputArr), [inputArr]);
+  const response = useSelector(state => state.userResponse);
 
-  // console.log("result: ", result);
+  const result = useMemo(() => convertToOrderBlocks(inputArr, response), [inputArr, response]);
 
   const handleJsonChange = useCallback(val => setJson(val), []);
   const handleJsonBlur = useCallback(() => {
@@ -33,7 +34,6 @@ export default function ConfigurationPage() {
     setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
   }, []);
 
-  // Remove field at indexPath from inputArr
   const onDelete = useCallback((indexPath) => {
     setInputArr(prev => removeItemInNestedArray(prev, indexPath));
   }, []);
