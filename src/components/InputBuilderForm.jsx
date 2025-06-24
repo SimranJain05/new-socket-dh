@@ -66,8 +66,73 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     );
     break;
   case 'dropdown': {
-    const options = info.options || [];
-    // allowMultiSelect: true => use multiple Select
+    // Dynamic dropdown support
+    let options = info.options || [];
+    let loading = false;
+    let error = null;
+    const [dynamicOptions, setDynamicOptions] = useState([]);
+    const [dynamicLoading, setDynamicLoading] = useState(false);
+    const [dynamicError, setDynamicError] = useState(null);
+
+    // Helper: safely evaluate dynamicOptions string as async function
+    function safeEvalDynamicOptions(fnStr) {
+      // eslint-disable-next-line no-new-func
+      return Function('userResponse', `return (${fnStr})(userResponse);`);
+    }
+
+    // Track last options to clear value if needed
+    const prevOptionsRef = React.useRef([]);
+    useEffect(() => {
+      let active = true;
+      if (info.dynamicOptions) {
+        setDynamicLoading(true);
+        setDynamicError(null);
+        setDynamicOptions([]);
+        (async () => {
+          try {
+            const fn = safeEvalDynamicOptions(info.dynamicOptions);
+            const result = await fn(response);
+            if (active) {
+              const newOptions = Array.isArray(result) ? result : [];
+              setDynamicOptions(newOptions);
+              // Clear value if not present in new options
+              const validValues = newOptions.map(o => o.value);
+              if (info.allowMultiSelect) {
+                if (Array.isArray(localValue) && localValue.some(val => !validValues.includes(val)) && localValue.length > 0) {
+                  setLocalValue([]);
+                  dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: [] } });
+                }
+              } else {
+                if (localValue && !validValues.includes(localValue)) {
+                  setLocalValue('');
+                  dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: '' } });
+                }
+              }
+            }
+          } catch (err) {
+            if (active) {
+              setDynamicError('Failed to load options');
+              setDynamicOptions([]);
+            }
+          } finally {
+            if (active) setDynamicLoading(false);
+          }
+        })();
+      }
+      return () => { active = false; };
+      // Re-run when any dependency field value changes
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, info.dynamicOptions ? (info.optionDependencies || []).map(dep => {
+      const depPath = Array.isArray(dep) ? dep : [dep];
+      return getNested(response, depPath);
+    }) : []);
+
+    if (info.dynamicOptions) {
+      options = dynamicOptions;
+      loading = dynamicLoading;
+      error = dynamicError;
+    }
+
     field = (
       <Select
         size="small"
@@ -76,10 +141,12 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
         value={localValue}
         onChange={e => setLocalValue(e.target.value)}
         onBlur={handleBlur}
-        disabled={isDisabled}
+        disabled={isDisabled || loading}
         defaultValue={info.allowMultiSelect ? [] : ''}
         sx={{ mb: 1, minWidth: 200 }}
         renderValue={selected => {
+          if (loading) return <span className="text-gray-400">Loading...</span>;
+          if (error) return <span className="text-red-500">Error</span>;
           if (!selected || (Array.isArray(selected) && selected.length === 0)) {
             return <span className="text-gray-400">{info.title || info.label}</span>;
           }
@@ -89,7 +156,7 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
           return options.find(opt => opt.value === selected)?.label || selected;
         }}
       >
-        <MenuItem value="" disabled>{info.title || info.label}</MenuItem>
+        <MenuItem value="" disabled>{loading ? 'Loading...' : (error ? 'Error' : (info.title || info.label))}</MenuItem>
         {options.map(opt => (
           <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
         ))}
