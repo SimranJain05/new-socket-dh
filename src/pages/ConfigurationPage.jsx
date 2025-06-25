@@ -1,18 +1,36 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import JsonInputField from '../components/JsonInputField.jsx';
 import { MemoizedInputBuilderForm } from '../components/InputBuilderForm.jsx';
 import { convertToOrderBlocks, moveItemInNestedArray, removeItemInNestedArray } from '../utils.js';
 import { AppBar, Toolbar, Typography, Box, Paper } from '@mui/material';
 import { input } from '../inputData.js';
+import { useSelector } from 'react-redux';
 
 export default function ConfigurationPage() {
   const [json, setJson] = useState(JSON.stringify(input, null, 2));
   const [inputArr, setInputArr] = useState(input);
   const [error, setError] = useState(null);
 
-  const result = useMemo(() => convertToOrderBlocks(inputArr), [inputArr]);
+  const userResponse = useSelector(state => state.userResponse);
+  const [result, setResult] = useState({ order: [], blocks: {} });
+  const [loading, setLoading] = useState(false);
 
-  // console.log("result: ", result);
+  // Recompute blocks whenever inputArr or userResponse changes
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await convertToOrderBlocks(inputArr, userResponse);
+        if (active) setResult(res);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [inputArr, userResponse]);
+
+  console.log("result: ", result);
 
   const handleJsonChange = useCallback(val => setJson(val), []);
   const handleJsonBlur = useCallback(() => {

@@ -18,6 +18,9 @@ export const input = [
     "allowMultiSelect": false
   },
   {
+    "source": "async function(userResponse) { await new Promise(res => setTimeout(res, 500)); console.log('api 2 called'); if (userResponse.dummyDependency === 'foo') return [{ id: 'df1', type: 'textField', title: 'dynamic field1', placeholder: 'dynamic field1', help: 'Some help text for C34', required: true, defaultValue: '' }]; if (userResponse.dummyDependency === 'bar') return [{ id: 'df2', type: 'textField', title: 'dynamic field2', placeholder: 'dynamic field2', help: 'Some help text for C34', required: true, defaultValue: '' }]; return []; }",
+  },
+  {
     "placeholder": "Enter your name",
     "title": "Full Name",
     "help": "Please provide your full legal name",
@@ -108,7 +111,8 @@ export const input = [
             "children": []
           }
         ]
-      }
+      },
+      { "source": "return { id: 'C34', type: 'textField', title: 'C34 Field', placeholder: 'Static field C34', help: 'Some help text for C34', required: true, defaultValue: '' }" }
     ]
   }
 ];
