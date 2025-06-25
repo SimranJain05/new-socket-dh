@@ -1,32 +1,144 @@
 // Centralized utility functions for new-socket-dh
 // Consolidate all reusable logic here
 
+function extractDependencies(src) {
+  if (typeof src !== 'string') return [];
+  const deps = new Set();
+  const dotRegex = /userResponse\.([a-zA-Z0-9_]+)/g;
+  let m;
+  while ((m = dotRegex.exec(src))) {
+    deps.add(m[1]);
+  }
+  const bracketRegex = /userResponse\["([^\"]+)"\]/g;
+  while ((m = bracketRegex.exec(src))) {
+    deps.add(m[1]);
+  }
+  return Array.from(deps);
+}
+
+export async function evaluateSource(src, ctx = {}) {
+  if (typeof src !== 'string') return src;
+  const trimmed = src.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    const res = await fetch(trimmed);
+    if (!res.ok) throw new Error(`Request failed ${res.status}`);
+    return res.json();
+  }
+  try {
+    let body;
+    if (/^return[\s\n]/.test(trimmed)) {
+      body = trimmed;
+    } else {
+      body = `return (${trimmed});`;
+    }
+    // eslint-disable-next-line no-new-func
+    const wrapper = new Function('userResponse', body);
+    let val = wrapper(ctx.userResponse !== undefined ? ctx.userResponse : ctx);
+    if (typeof val === 'function') {
+      val = val(ctx.userResponse !== undefined ? ctx.userResponse : ctx);
+    }
+    return await val;
+  } catch (err) {
+    console.error('evaluateSource failed', err);
+    throw err;
+  }
+}
+
 // --- Block Utilities ---
-/**
- * Converts an input array of blocks to an order + blocks structure.
- * @param {Array} inputArr
- * @returns {{order: Array, blocks: Object}}
- */
-export function convertToOrderBlocks(inputArr) {
-  const order = inputArr.map(item => item.id);
+export async function convertToOrderBlocks(inputArr, userResponse = {}) {
+  const order = [];
   const blocks = {};
-  function processBlock(obj) {
+  async function processBlock(obj) {
     if (!obj) return {};
-    const { children, ...info } = obj;
+    let workingObj = { ...obj };
+    const collectedDeps = new Set();
+    if (obj.source) {
+      extractDependencies(obj.source).forEach(d=>collectedDeps.add(d));
+
+  try {
+    // eslint-disable-next-line no-await-in-loop
+    const evaluated = await evaluateSource(obj.source, { userResponse });
+    if (Array.isArray(evaluated)) {
+      // If source produced multiple blocks, process them individually and return sentinel
+      const processedChildren = [];
+      for (const ev of evaluated) {
+        const pc = await processBlock(ev);
+        if (pc && pc.info && pc.info.id) processedChildren.push(pc);
+      }
+      return { multiple: processedChildren };
+    }
+    workingObj = { ...evaluated };
+
+    // remove source so downstream components don't see raw code
+    delete workingObj.source;
+  } catch (err) {
+    console.error('Failed to evaluate source for', obj.id, err);
+  }
+}
+const { children, dynamicChildren, dynamicOptions, ...info } = workingObj;
+    if (collectedDeps.size) {
+      info.depends_on = Array.from(new Set([...(info.depends_on || []), ...collectedDeps]));
+    }
     let childarr = [];
     let childblocks = {};
-    if (Array.isArray(children)) {
-      childarr = children.map(child => child.id);
-      for (const child of children) {
-        childblocks[child.id] = processBlock(child);
+if (dynamicOptions) {
+  extractDependencies(dynamicOptions).forEach(d=>collectedDeps.add(d));
+  try {
+    // eslint-disable-next-line no-await-in-loop
+    const opts = await evaluateSource(dynamicOptions, { userResponse });
+    info.options = Array.isArray(opts) ? opts : [];
+      if (collectedDeps.size) {
+        info.depends_on = Array.from(new Set([...(info.depends_on || []), ...collectedDeps]));
       }
-    } else if (typeof children === 'string') {
+  } catch (err) {
+    console.error('Failed to eval dynamicOptions for', info.id, err);
+    info.options = [];
+  }
+}
+if (Array.isArray(children)) {
+      for (const child of children) {
+        const processedChild = await processBlock(child);
+        if (processedChild && processedChild.info && processedChild.info.id) {
+          const cid = processedChild.info.id;
+          childarr.push(cid);
+          childblocks[cid] = processedChild;
+        }
+      }
+    } else if (typeof dynamicChildren === 'string') {
+  try {
+    // eslint-disable-next-line no-await-in-loop
+    const evaluatedChildren = await evaluateSource(dynamicChildren, { userResponse });
+    if (Array.isArray(evaluatedChildren)) {
+      childarr = evaluatedChildren.map(child => child.id);
+      for (const child of evaluatedChildren) {
+        childblocks[child.id] = await processBlock(child);
+      }
+    }
+  } catch (err) {
+    console.error('Failed dynamicChildren eval for', info.id, err);
+  }
+} else if (typeof children === 'string') {
       info.dynamicChildren = children;
     }
     return { info, childarr, childblocks };
   }
+
+  // helper to ingest processed output(s)
+  const ingest = (processed)=>{
+    if (!processed) return;
+    if (processed.multiple) {
+      processed.multiple.forEach(ingest);
+      return;
+    }
+    const currentId = processed.info && processed.info.id;
+    if (!currentId) return;
+    order.push(currentId);
+    blocks[currentId] = processed;
+  };
+
   for (const item of inputArr) {
-    blocks[item.id] = processBlock(item);
+    const processed = await processBlock(item);
+    ingest(processed);
   }
   return { order, blocks };
 }
