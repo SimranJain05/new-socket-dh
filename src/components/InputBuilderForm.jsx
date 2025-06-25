@@ -34,6 +34,18 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     }
     // eslint-disable-next-line
   }, [value, info.allowMultiSelect]);
+
+
+
+  useEffect(() => {
+    // Clear current field if it depends on something that is now invalid
+    if (isDisabled && value !== undefined && value !== '' && value !== null) {
+      dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: info.allowMultiSelect ? [] : '' } });
+    }
+  }, [isDisabled]); // <-- only trigger this if isDisabled change
+
+
+
   function handleBlur() {
     dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: localValue } });
   }
