@@ -143,86 +143,68 @@ if (Array.isArray(children)) {
   return { order, blocks };
 }
 
-// --- Move/Delete Utilities ---
-/**
- * Removes an item at a given index path from a nested array structure.
- * @param {Array} arr
- * @param {Array} path
- * @returns {Array}
- */
-export function removeItemInNestedArray(arr, path) {
-  if (!Array.isArray(arr)) return [];
-  if (path.length === 0) return arr;
-  const [head, ...rest] = path;
+// --- Move/Delete utilities (by idPath) ---
+// idPath is an array of ids representing nested path, e.g. ['section','field']
+export function moveItemByIdPath(arr, idPath, direction) {
+  if (!Array.isArray(arr) || idPath.length === 0) return arr;
+  const [currentId, ...rest] = idPath;
+  const idx = arr.findIndex(item => item.id === currentId);
+  if (idx === -1) return arr;
   if (rest.length === 0) {
-    // Remove at this level
-    return arr.filter((_, idx) => idx !== head);
-  } else {
-    // Go deeper
-    return arr.map((item, idx) =>
-    idx === head
-        ? { ...item, children: removeItemInNestedArray(item.children || [], rest) }
-        : item
-    );
-  }
-}
-
-/**
- * Moves an item up or down in a nested array structure by index path.
- * @param {Array} arr
- * @param {Array} path
- * @param {'up'|'down'} direction
- * @returns {Array}
- */
-export function moveItemInNestedArray(arr, path, direction) {
-  if (path.length === 0) return arr;
-  const [head, ...rest] = path;
-  if (rest.length === 0) {
-    // At the parent level
-    const idx = head;
     const newArr = [...arr];
-    if (
-      (direction === 'up' && idx === 0) ||
-      (direction === 'down' && idx === arr.length - 1)
-    ) {
-      return arr; // Can't move
-    }
+    if ((direction === 'up' && idx === 0) || (direction === 'down' && idx === newArr.length - 1)) return arr;
     const swapWith = direction === 'up' ? idx - 1 : idx + 1;
     [newArr[idx], newArr[swapWith]] = [newArr[swapWith], newArr[idx]];
     return newArr;
-  } else {
-    // Go deeper
-    return arr.map((item, idx) =>
-      idx === head
-        ? {
-            ...item,
-            children: moveItemInNestedArray(item.children || [], rest, direction),
-          }
-        : item
-    );
   }
+  return arr.map((item, i) =>
+    i === idx ? { ...item, children: moveItemByIdPath(item.children || [], rest, direction) } : item
+  );
 }
 
-/**
- * Recursively updates a nested array by index path.
- * @param {Array} arr
- * @param {Array} path
- * @param {Function} updater - Function to update the target item/array
- * @returns {Array}
- */
+export function removeItemByIdPath(arr, idPath) {
+  if (!Array.isArray(arr) || idPath.length === 0) return arr;
+  const [currentId, ...rest] = idPath;
+  const idx = arr.findIndex(item => item.id === currentId);
+  if (idx === -1) return arr;
+  if (rest.length === 0) {
+    return arr.filter((_, i) => i !== idx);
+  }
+  return arr.map((item, i) =>
+    i === idx ? { ...item, children: removeItemByIdPath(item.children || [], rest) } : item
+  );
+}
 
-//Purpose: Recursively updates nested array based on index path
-// Helper to update nested array by index path (memoized outside component)
-//path for example [2,0,1]
+// Reorders only currently visible siblings based on drag result
+// visibleIds: array of ids currently rendered (order before drag)
+// Returns new array with those ids reordered, while non-visible items keep positions.
+export function reorderByVisibleIds(arr, visibleIds, activeId, overId) {
+  if (!Array.isArray(arr)) return arr;
+  const idSet = new Set(visibleIds);
+  const visibles = arr.filter(item => idSet.has(item.id));
+  const from = visibles.findIndex(i => i.id === activeId);
+  const to = visibles.findIndex(i => i.id === overId);
+  if (from === -1 || to === -1) return arr;
+  const newVisibles = [...visibles];
+  const [moved] = newVisibles.splice(from, 1);
+  newVisibles.splice(to, 0, moved);
+  let vIdx = 0;
+  return arr.map(item => (idSet.has(item.id) ? newVisibles[vIdx++] : item));
+}
 
-export const updateByIndexPath = (arr, path, updater) => {
-  if (path.length === 0) return updater(arr);
-  const [head, ...rest] = path;
-  return arr.map((item, idx) =>
-    idx === head
-      ? rest.length
-        ? { ...item, children: updateByIndexPath(item.children || [], rest, updater) }
-        : updater(item)
+// Recursively reorder visible items at a given idPath (path to parent container)
+export function reorderVisibleAtIdPath(arr, idPath, visibleIds, activeId, overId) {
+  if (!Array.isArray(arr)) return arr;
+  if (idPath.length === 0) {
+    return reorderByVisibleIds(arr, visibleIds, activeId, overId);
+  }
+  const [currentId, ...rest] = idPath;
+  return arr.map(item =>
+    item.id === currentId
+      ? {
+          ...item,
+          children: reorderVisibleAtIdPath(item.children || [], rest, visibleIds, activeId, overId),
+        }
       : item
   );
-};
+}

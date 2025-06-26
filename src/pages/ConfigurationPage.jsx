@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import JsonInputField from '../components/JsonInputField.jsx';
 import { MemoizedInputBuilderForm } from '../components/InputBuilderForm.jsx';
-import { convertToOrderBlocks, moveItemInNestedArray, removeItemInNestedArray } from '../utils.js';
+import { convertToOrderBlocks, moveItemByIdPath, removeItemByIdPath, reorderVisibleAtIdPath } from '../utils.js';
 import { AppBar, Toolbar, Typography, Box, Paper } from '@mui/material';
 import { input } from '../inputData.js';
 import { useSelector } from 'react-redux';
@@ -13,18 +13,16 @@ export default function ConfigurationPage() {
 
   const userResponse = useSelector(state => state.userResponse);
   const [result, setResult] = useState({ order: [], blocks: {} });
-  const [loading, setLoading] = useState(false);
 
   // Recompute blocks whenever inputArr or userResponse changes
   useEffect(() => {
     let active = true;
-    setLoading(true);
     (async () => {
       try {
         const res = await convertToOrderBlocks(inputArr, userResponse);
         if (active) setResult(res);
-      } finally {
-        if (active) setLoading(false);
+      } catch (err) {
+        console.error('Failed to convert blocks', err);
       }
     })();
     return () => { active = false; };
@@ -47,13 +45,17 @@ export default function ConfigurationPage() {
     setJson(JSON.stringify(inputArr, null, 2));
   }, [inputArr]);
 
-  const onMove = useCallback((indexPath, direction) => {
-    setInputArr(prev => moveItemInNestedArray(prev, indexPath, direction));
+  const onReorder = useCallback((parentPath, visibleIds, activeId, overId) => {
+    setInputArr(prev => reorderVisibleAtIdPath(prev, parentPath, visibleIds, activeId, overId));
+  }, []);
+
+  const onMove = useCallback((idPath, direction) => {
+    setInputArr(prev => moveItemByIdPath(prev, idPath, direction));
   }, []);
 
   // Remove field at indexPath from inputArr
-  const onDelete = useCallback((indexPath) => {
-    setInputArr(prev => removeItemInNestedArray(prev, indexPath));
+  const onDelete = useCallback((idPath) => {
+    setInputArr(prev => removeItemByIdPath(prev, idPath));
   }, []);
 
   return (
@@ -70,7 +72,7 @@ export default function ConfigurationPage() {
         </Paper>
         <Paper sx={{ width: '50%', p: 2 }}>
           <Typography variant="subtitle1" fontWeight={600} mb={1}>Form Preview</Typography>
-          <MemoizedInputBuilderForm order={result.order} blocks={result.blocks} onMove={onMove} onDelete={onDelete} />
+          <MemoizedInputBuilderForm order={result.order} blocks={result.blocks} onMove={onMove} onDelete={onDelete} onReorder={onReorder} />
         </Paper>
       </Box>
     </Box>

@@ -1,29 +1,45 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, Box, TextField, Checkbox, FormControlLabel, Select, MenuItem, IconButton, Tooltip, Typography } from '@mui/material';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import DeleteIcon from '@mui/icons-material/Delete';
 import isEqual from 'lodash.isequal';
 import { useDispatch, useSelector } from 'react-redux';
 
-function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPath, idPath, onMove, onDelete }) {
+function InputBuilderBlock({ blockId, block, index, level, indexPath, idPath, onDelete, onReorder }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: blockId });
+  const styleWrapper = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
   const dispatch = useDispatch();
-  const response = useSelector(state => state.userResponse);
   const { info, childarr, childblocks } = block;
   const depends = info.depends_on || [];
-  // For full path dependency, use getNested to check each
-  const isDisabled = depends.length > 0 && depends.some(depPath => {
-    const arrPath = Array.isArray(depPath) ? depPath : [depPath];
-    const val = getNested(response, arrPath);
-    return !val && val !== 0 && val !== false;
-  });
   const myIdPath = idPath ? [...idPath, info.id] : [info.id];
   // Helper to get nested value by idPath
   function getNested(obj, path) {
     return path.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
   }
+
+  // Subscribe ONLY to the value this field cares about
+  const value = useSelector(
+    state => getNested(state.userResponse, myIdPath),
+    isEqual
+  );
+
+  // Subscribe to the computed disabled flag (depends_on)
+  const isDisabled = useSelector(
+    state => depends.length > 0 && depends.some(depPath => {
+      const arrPath = Array.isArray(depPath) ? depPath : [depPath];
+      const val = getNested(state.userResponse, arrPath);
+      return !val && val !== 0 && val !== false;
+    }),
+    (prev, next) => prev === next // boolean compare
+  );
+
   const [localValue, setLocalValue] = useState(info.allowMultiSelect ? [] : '');
-  const value = getNested(response, myIdPath);
 
   useEffect(() => {
     // Sync localValue from Redux value if present, else default
@@ -35,16 +51,12 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
     // eslint-disable-next-line
   }, [value, info.allowMultiSelect]);
 
-
-
   useEffect(() => {
     // Clear current field if it depends on something that is now invalid
     if (isDisabled && value !== undefined && value !== '' && value !== null) {
       dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: info.allowMultiSelect ? [] : '' } });
     }
   }, [isDisabled]); // <-- only trigger this if isDisabled change
-
-
 
   function handleBlur() {
     dispatch({ type: 'userResponse/updateUserResponse', payload: { idPath: myIdPath, value: localValue } });
@@ -135,9 +147,9 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
               blocks={Object.fromEntries(info.children.map(child => [child.id, { info: child }]))}
               level={level + 1}
               indexPath={[...(indexPath||[]), index]}
-              idPath={[...(idPath||[]), info.id]}
-              onMove={onMove}
+              idPath={[...(idPath||[]), info.id]}         
               onDelete={onDelete}
+              onReorder={onReorder}
             />
         )}
       </Box>
@@ -210,24 +222,39 @@ function InputBuilderBlock({ blockId, block, index, orderLength, level, indexPat
       />
     );
 }
-  const canMoveUp = index > 0;
-  const canMoveDown = index < orderLength - 1;
   return (
-    <Card variant="outlined" sx={{ mb: 2, background: level === 0 ? '#f5f7fa' : '#f8fafc' }}>
-      <CardContent sx={{pb: '8px!important', display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Tooltip title="Move Up"><span><IconButton size="small" disabled={!canMoveUp} onClick={() => onMove([...indexPath, index], 'up')}><ArrowUpwardIcon fontSize="small" /></IconButton></span></Tooltip>
-          <Tooltip title="Move Down"><span><IconButton size="small" disabled={!canMoveDown} onClick={() => onMove([...indexPath, index], 'down')}><ArrowDownwardIcon fontSize="small" /></IconButton></span></Tooltip>
-        </Box>
-        <Box>
-          {field}
-          {Array.isArray(childarr) && childarr.length > 0 && (
-            <MemoizedInputBuilderForm order={childarr} blocks={childblocks} level={level + 1} indexPath={[...(indexPath||[]), index]} idPath={myIdPath} onMove={onMove} onDelete={onDelete} />
+    <div ref={setNodeRef} style={styleWrapper}>
+      <Box sx={{ display:'flex', alignItems:'stretch' }}>
+      <Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'grab', mr:1 }} {...attributes} {...listeners}>
+        <DragIndicatorIcon fontSize="small" color='action'/>
+      </Box>
+      <Card variant="outlined" sx={{ mb: 2, background: level === 0 ? '#f5f7fa' : '#f8fafc' }}>
+        <CardContent sx={{pb: '8px!important', display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+          <Box>
+            {field}
+            {Array.isArray(childarr) && childarr.length > 0 && (
+            <MemoizedInputBuilderForm
+              order={childarr}
+              blocks={childblocks}
+              level={level + 1}
+              indexPath={[...(indexPath||[]), index]}
+              idPath={myIdPath}
+              onDelete={onDelete}
+              onReorder={onReorder}
+            />
           )}
         </Box>
-        <Tooltip title="Delete"><span><IconButton size="small" color="error" onClick={() => onDelete([...indexPath, index])}><DeleteIcon fontSize="small" /></IconButton></span></Tooltip>
-      </CardContent>
-    </Card>
+        <Tooltip title="Delete">
+          <span>
+            <IconButton size="small" color="error" onClick={() => onDelete(myIdPath)}>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        </CardContent>
+      </Card>
+      </Box>
+    </div>
   );
 }
 
@@ -235,18 +262,37 @@ const MemoizedInputBuilderBlock = React.memo(InputBuilderBlock, (prev, next) => 
   return (
     prev.blockId === next.blockId &&
     isEqual(prev.block, next.block) &&
-    prev.index === next.index &&
-    prev.orderLength === next.orderLength &&
+    prev.index === next.index &&   
     prev.level === next.level &&
     isEqual(prev.indexPath, next.indexPath)
   );
-}); // already uses isEqual for block and indexPath, correct as is.
-
-function InputBuilderForm({ order, blocks, level = 0, indexPath = [], idPath = [], onMove, onDelete }) {
-  const memoizedOrder = useMemo(() => order, [order]);
+});
+function InputBuilderForm({ order, blocks, level = 0, indexPath = [], idPath = [], onDelete, onReorder }) {
+  const [localOrder, setLocalOrder] = useState(order);
+  useEffect(() => {
+    setLocalOrder(order);
+  }, [order]);
+  const memoizedOrder = useMemo(() => localOrder, [localOrder]);
   const memoizedBlocks = useMemo(() => blocks, [blocks]);
   if (!memoizedOrder || !memoizedBlocks) return null;
+  
+  const handleDragEnd = useCallback(({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const oldIdx = memoizedOrder.indexOf(active.id);
+    const newIdx = memoizedOrder.indexOf(over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    setLocalOrder(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(oldIdx, 1);
+      updated.splice(newIdx, 0, moved);
+      return updated;
+    });
+    onReorder && onReorder(idPath, memoizedOrder, active.id, over.id);
+  }, [memoizedOrder, onReorder]);
+
   return (
+    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={memoizedOrder} strategy={verticalListSortingStrategy}>
         <Box sx={{ pl: Math.min(level * 4, 32) }}>
           {memoizedOrder.map((blockId, idx) => {
             const block = memoizedBlocks[blockId];
@@ -257,16 +303,17 @@ function InputBuilderForm({ order, blocks, level = 0, indexPath = [], idPath = [
                 blockId={blockId}
                 block={block}
                 index={idx}
-                orderLength={memoizedOrder.length}
                 level={level}
                 indexPath={indexPath}
                 idPath={idPath}
-                onMove={onMove}
+                onReorder={onReorder}
                 onDelete={onDelete}
               />
             );
           })}
         </Box>
+      </SortableContext>
+    </DndContext>
   );
 }
 
